@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>量化策略分析平台 v4.3 — 多模型交易系统</title>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/echarts@5.5.1/dist/echarts.min.js"></script>
+<style>
+:root {
+  --bg: #f8f9fb; --card-bg: #ffffff; --text: #2c3e50; --text-secondary: #7f8c8d;
+  --border: #e8ecf1; --accent: #e74c3c; --green: #27ae60; --blue: #3498db;
+  --purple: #8e44ad; --orange: #e67e22;
+  --warning-bg: #fff3cd; --warning-border: #ffc107;
+  --success-bg: #eaf7ea; --disabled-bg: #f1f3f5; --disabled-text: #bdc3c7;
+  --radius: 10px; --shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+.header{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);color:#fff;padding:24px 32px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.header h1{font-size:1.5rem;font-weight:700}
+.header .badge{background:rgba(255,255,255,0.15);padding:4px 14px;border-radius:20px;font-size:0.76rem;letter-spacing:1px}
+.container{max-width:1400px;margin:0 auto;padding:20px 24px;display:flex;flex-direction:column;gap:18px}
+.card{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 24px}
+.card-title{font-size:0.98rem;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card-title .icon{font-size:1.1rem}
+.hidden{display:none!important}
+
+.upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:28px;text-align:center;cursor:pointer;transition:all .2s;background:#fafbfc}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--blue);background:#eef5fb}
+.upload-zone .upload-icon{font-size:2rem;margin-bottom:6px}
+.upload-zone .upload-text{color:var(--text-secondary);font-size:0.9rem}
+.upload-zone .upload-hint{color:#999;font-size:0.76rem;margin-top:4px}
+.upload-warning{margin-top:12px;background:var(--warning-bg);border:1px solid var(--warning-border);border-radius:6px;padding:10px 16px;font-size:0.82rem;color:#856404;display:flex;align-items:center;gap:8px}
+.file-info{margin-top:12px;padding:10px 16px;background:var(--success-bg);border:1px solid #a3d9a3;border-radius:6px;font-size:0.82rem;color:#256029;display:flex;align-items:center;gap:8px}
+
+.config-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.config-grid-full{grid-column:1/-1}
+
+.metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.metric-item{background:#f8f9fb;border:1px solid var(--border);border-radius:8px;padding:12px 14px}
+.metric-item .metric-label{font-size:0.74rem;color:var(--text-secondary);margin-bottom:2px}
+.metric-item .metric-value{font-size:1.2rem;font-weight:700}
+.metric-value.up{color:var(--accent)}.metric-value.down{color:var(--green)}
+.diag-section-title{font-size:0.8rem;font-weight:700;color:var(--text-secondary);margin:14px 0 8px}
+.diag-section-title:first-child{margin-top:0}
+
+.flex-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.input-group{display:flex;flex-direction:column;gap:4px}
+.input-group label{font-size:0.78rem;color:var(--text-secondary);font-weight:600}
+.input-group input[type="number"],.input-group select{padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.88rem}
+.input-group input[type="number"]{width:120px}
+.input-group select{min-width:140px;cursor:pointer;background:#fff}
+
+/* Checkbox styling */
+.check-row{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:6px;margin-bottom:4px;font-size:0.83rem;background:#fafbfc;transition:background .15s}
+.check-row:hover{background:#eef5fb}
+.check-row input[type="checkbox"]{width:16px;height:16px;cursor:pointer;accent-color:var(--blue);flex-shrink:0}
+.check-row .check-label{flex:1;cursor:pointer;user-select:none}
+.check-row .check-badge{font-size:0.68rem;padding:1px 8px;border-radius:10px;font-weight:600;white-space:nowrap;flex-shrink:0}
+.check-badge.ready{background:#eaf7ea;color:#256029}
+.check-badge.planned{background:var(--disabled-bg);color:var(--disabled-text)}
+.check-row.disabled{opacity:0.55;cursor:not-allowed}
+.check-row.disabled input[type="checkbox"]{cursor:not-allowed}
+.check-row.disabled .check-label{cursor:not-allowed}
+.cond-detail{padding:4px 0 4px 26px;font-size:0.76rem;color:var(--text-secondary);min-height:0;overflow:hidden;transition:all .2s}
+.cond-detail.collapsed{max-height:0;padding-top:0;padding-bottom:0;opacity:0}
+
+.btn{padding:9px 22px;border:none;border-radius:6px;font-size:0.88rem;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:hover{background:#2980b9}
+.btn-primary:disabled{background:#bdc3c7;cursor:not-allowed}
+.btn-lg{padding:12px 36px;font-size:0.95rem}
+
+#chart-container{width:100%;height:500px}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:0.82rem}
+table th{background:#f1f3f5;text-align:left;padding:8px 12px;font-weight:700;border-bottom:2px solid var(--border);white-space:nowrap}
+table td{padding:7px 12px;border-bottom:1px solid #f1f3f5}
+table tr:hover td{background:#fafbfc}
+.signal-gold{color:var(--accent);font-weight:700}
+.signal-death{color:var(--green);font-weight:700}
+.pnl-up{color:var(--accent);font-weight:600}
+.pnl-down{color:var(--green);font-weight:600}
+.account-summary{background:linear-gradient(135deg,#f0f4ff,#fafbfc);border:1px solid #c8d6e5;border-radius:8px;padding:14px 18px;margin-bottom:14px;display:flex;gap:24px;flex-wrap:wrap;font-size:0.84rem}
+.account-summary .as-item{display:flex;flex-direction:column}
+.account-summary .as-label{color:var(--text-secondary);font-size:0.74rem}
+.account-summary .as-value{font-weight:700;font-size:1rem}
+
+.preview-scroll{max-height:180px;overflow:auto}
+.empty-state{color:#999;padding:16px;text-align:center;font-size:0.84rem}
+.date-range-row{display:flex;align-items:center;gap:14px;margin-top:12px;flex-wrap:wrap}
+.date-range-row label{font-size:0.82rem;font-weight:600;color:var(--text-secondary)}
+.date-range-row select{padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.86rem}
+
+@media(max-width:900px){.config-grid{grid-template-columns:1fr}.metrics-grid{grid-template-columns:1fr 1fr}.header{padding:16px 18px}.header h1{font-size:1.2rem}.container{padding:12px}}
+</style>
+</head>
+<body>
+
+<div class="header"><h1>📈 量化策略分析平台</h1><span class="badge">v4.3 · 多模型交易系统</span></div>
+
+<div class="container">
+<!-- ===== 配置区 ===== -->
+
+<!-- ① 数据导入 -->
+<div class="card" id="upload-card">
+  <div class="card-title"><span class="icon">📁</span> ① 数据导入</div>
+  <div class="upload-zone" id="upload-zone">
+    <div class="upload-icon">⬇️</div>
+    <div class="upload-text">拖拽或点击上传 Excel (.xlsx) / CSV 文件</div>
+    <div class="upload-hint">支持 .xlsx .xls .csv 格式</div>
+  </div>
+  <input type="file" id="file-input" accept=".xlsx,.xls,.csv" class="hidden">
+  <div class="file-info hidden" id="file-info"></div>
+  <div class="upload-warning">⚠️ 请上传<strong>复权后的数据</strong>（前复权/后复权均可），须包含日期、开盘价、收盘价、最高价、最低价、成交量列</div>
+  <div class="date-range-row hidden" id="date-range-row">
+    <label>📅 分析区间:</label>
+    <select id="date-range-select">
+      <option value="1">最近 1 年</option><option value="2">最近 2 年</option>
+      <option value="3">最近 3 年</option><option value="4">最近 4 年</option>
+      <option value="5" selected>最近 5 年</option>
+    </select>
+  </div>
+  <div class="hidden" id="preview-block" style="margin-top:12px">
+    <div style="font-size:0.82rem;font-weight:700;margin-bottom:8px;color:var(--text-secondary)">🔍 数据预览（前5行）</div>
+    <div class="preview-scroll" id="preview-table"></div>
+  </div>
+</div>
+
+<!-- ② 数据诊断 -->
+<div class="card hidden" id="diag-card">
+  <div class="card-title"><span class="icon">🔍</span> ② 数据诊断</div>
+  <div class="diag-section-title">📋 数据概览</div>
+  <div class="metrics-grid"><div class="metric-item"><div class="metric-label">总交易日数</div><div class="metric-value" id="diag-days" style="color:var(--blue);font-size:1rem">--</div></div>
+  <div class="metric-item"><div class="metric-label">日期范围</div><div class="metric-value" id="diag-range" style="font-size:0.78rem;font-weight:600">--</div></div>
+  <div class="metric-item"><div class="metric-label">价格区间</div><div class="metric-value" id="diag-price-range" style="font-size:0.88rem;font-weight:700">--</div></div>
+  <div class="metric-item"><div class="metric-label">区间涨跌幅</div><div class="metric-value" id="diag-return" style="font-size:0.95rem">--</div></div></div>
+  <div class="diag-section-title">✅ 数据质量</div>
+  <div class="metrics-grid"><div class="metric-item"><div class="metric-label">缺失值</div><div class="metric-value" id="diag-missing" style="font-size:0.9rem">--</div></div>
+  <div class="metric-item"><div class="metric-label">OHLC逻辑错误</div><div class="metric-value" id="diag-ohlc-err" style="font-size:0.9rem">--</div></div>
+  <div class="metric-item"><div class="metric-label">异常波动日(|涨跌幅|>5%)</div><div class="metric-value" id="diag-anomaly" style="font-size:0.9rem">--</div></div>
+  <div class="metric-item"><div class="metric-label">预期休市缺口</div><div class="metric-value" id="diag-gap" style="font-size:0.9rem">--</div></div></div>
+  <div class="diag-section-title">📈 收益率特征</div>
+  <div class="metrics-grid"><div class="metric-item"><div class="metric-label">日均涨跌幅</div><div class="metric-value" id="diag-daily-ret" style="font-size:0.9rem">--</div></div>
+  <div class="metric-item"><div class="metric-label">日波动率(std)</div><div class="metric-value" id="diag-daily-vol" style="font-size:0.9rem">--</div></div>
+  <div class="metric-item"><div class="metric-label">年化波动率</div><div class="metric-value" id="diag-annual-vol" style="font-size:0.9rem">--</div></div>
+  <div class="metric-item"><div class="metric-label">最大单日涨幅/跌幅</div><div class="metric-value" id="diag-extreme" style="font-size:0.78rem">--</div></div></div>
+  <div class="diag-section-title">📊 量价关系</div>
+  <div class="metrics-grid"><div class="metric-item"><div class="metric-label">日均成交量</div><div class="metric-value" id="diag-avg-vol" style="font-size:0.88rem">--</div></div>
+  <div class="metric-item"><div class="metric-label">最大成交量日</div><div class="metric-value" id="diag-max-vol-day" style="font-size:0.76rem">--</div></div>
+  <div class="metric-item"><div class="metric-label">涨跌比(上涨日:下跌日)</div><div class="metric-value" id="diag-updown-ratio" style="font-size:0.88rem">--</div></div>
+  <div class="metric-item"><div class="metric-label">连涨/连跌最大天数</div><div class="metric-value" id="diag-streak" style="font-size:0.88rem">--</div></div></div>
+</div>
+
+<!-- ③-⑧ 配置卡片 -->
+<div class="hidden" id="config-area">
+  <div class="config-grid">
+    <!-- ③ 资金输入 -->
+    <div class="card">
+      <div class="card-title"><span class="icon">💰</span> ③ 资金输入</div>
+      <div class="input-group"><label>投资总资金 (元)</label><input type="number" id="capital-input" value="100000" min="1000" step="1000"></div>
+    </div>
+    <!-- ④ 模型选择 -->
+    <div class="card">
+      <div class="card-title"><span class="icon">⚙️</span> ④ 策略模型选择</div>
+      <div class="flex-row">
+        <div class="input-group"><label>选择模型</label><select id="model-select"></select></div>
+      </div>
+      <div class="flex-row" id="param-panel" style="margin-top:10px"></div>
+    </div>
+  </div>
+  <div class="config-grid" style="margin-top:18px">
+    <!-- ⑤ 买入管理 (v4.3: 复选框版) -->
+    <div class="card">
+      <div class="card-title"><span class="icon">🟢</span> ⑤ 买入管理</div>
+
+      <div style="font-size:0.8rem;font-weight:700;color:var(--text-secondary);margin-bottom:6px">📶 买入信号 <span style="font-weight:400;font-size:0.74rem">（OR 关系，任一勾选条件满足即触发）</span></div>
+      <div class="check-row">
+        <input type="checkbox" id="buy-golden-cross" checked>
+        <label class="check-label" for="buy-golden-cross">金叉（短期均线上穿长期均线）</label>
+        <span class="check-badge ready">已实现</span>
+      </div>
+      <div class="check-row disabled">
+        <input type="checkbox" id="buy-macd-cross" disabled>
+        <label class="check-label" for="buy-macd-cross">MACD金叉</label>
+        <span class="check-badge planned">待实现</span>
+      </div>
+      <div class="check-row disabled">
+        <input type="checkbox" id="buy-rsi-oversold" disabled>
+        <label class="check-label" for="buy-rsi-oversold">RSI超卖反弹</label>
+        <span class="check-badge planned">待实现</span>
+      </div>
+      <div class="check-row disabled">
+        <input type="checkbox" id="buy-volume-breakout" disabled>
+        <label class="check-label" for="buy-volume-breakout">成交量突破</label>
+        <span class="check-badge planned">待实现</span>
+      </div>
+
+      <div style="font-size:0.8rem;font-weight:700;color:var(--text-secondary);margin:10px 0 6px">🔍 趋势过滤 <span style="font-weight:400;font-size:0.74rem">（AND 关系，所有勾选条件同时满足才放行）</span></div>
+      <div class="check-row">
+        <input type="checkbox" id="filter-above-ma" checked>
+        <label class="check-label" for="filter-above-ma">价格在长期均线之上（close > MA_long）</label>
+        <span class="check-badge ready">已实现</span>
+      </div>
+      <div class="check-row">
+        <input type="checkbox" id="filter-ma-rising" checked>
+        <label class="check-label" for="filter-ma-rising">短期均线朝上（MA_short[t] > MA_short[t-1]）</label>
+        <span class="check-badge ready">已实现</span>
+      </div>
+      <div class="check-row disabled">
+        <input type="checkbox" id="filter-volume" disabled>
+        <label class="check-label" for="filter-volume">放量过滤</label>
+        <span class="check-badge planned">待实现</span>
+      </div>
+      <div class="check-row disabled">
+        <input type="checkbox" id="filter-volatility" disabled>
+        <label class="check-label" for="filter-volatility">波动率过滤</label>
+        <span class="check-badge planned">待实现</span>
+      </div>
+
+      <div style="color:var(--text-secondary);font-size:0.76rem;margin-top:8px">📝 买入触发 = 买入信号（OR）AND 趋势过滤（AND）</div>
+    </div>
+
+    <!-- ⑥ 卖出管理 (v4.3: 复选框版) -->
+    <div class="card">
+      <div class="card-title"><span class="icon">🔴</span> ⑥ 卖出管理</div>
+
+      <div style="font-size:0.8rem;font-weight:700;color:var(--text-secondary);margin-bottom:6px">🛑 止损 <span style="font-weight:400;font-size:0.74rem">（OR 关系，任一勾选条件满足即卖出）</span></div>
+      <div class="check-row">
+        <input type="checkbox" id="sell-atr-stop" checked onchange="toggleAtrParams()">
+        <label class="check-label" for="sell-atr-stop">ATR止损 — 止损价 = 入场价 − ATR倍数 × ATR(周期)</label>
+        <span class="check-badge ready">已实现</span>
+      </div>
+      <div class="cond-detail" id="atr-params">
+        <div class="flex-row">
+          <div class="input-group"><label>ATR 周期</label><input type="number" id="atr-period" value="14" min="2" max="60"></div>
+          <div class="input-group"><label>ATR 倍数</label><input type="number" id="atr-multiplier" value="2" min="0.5" max="5" step="0.5"></div>
+        </div>
+        <div style="color:var(--text-secondary);margin-top:4px">每个子仓位独立维护止损价（入场时锁定），当日收盘价 ≤ 止损价 → 触发</div>
+      </div>
+      <div class="check-row disabled">
+        <input type="checkbox" id="sell-trailing" disabled>
+        <label class="check-label" for="sell-trailing">追踪止损</label>
+        <span class="check-badge planned">待实现</span>
+      </div>
+      <div class="check-row disabled">
+        <input type="checkbox" id="sell-fixed-pct" disabled>
+        <label class="check-label" for="sell-fixed-pct">固定百分比止损</label>
+        <span class="check-badge planned">待实现</span>
+      </div>
+
+      <div style="font-size:0.8rem;font-weight:700;color:var(--text-secondary);margin:12px 0 6px">🎯 止盈 <span style="font-weight:400;font-size:0.74rem">（OR 关系，任一勾选条件满足即卖出）</span></div>
+      <div class="check-row">
+        <input type="checkbox" id="sell-death-cross" checked onchange="toggleDeathCrossParams()">
+        <label class="check-label" for="sell-death-cross">死叉止盈（短期均线下穿长期均线）</label>
+        <span class="check-badge ready">已实现</span>
+      </div>
+      <div class="cond-detail" id="death-cross-params">
+        <div class="input-group"><label>止盈方式</label><select id="exit-mode"><option value="all">全部平仓</option><option value="fifo">减仓FIFO（平最早那笔）</option></select></div>
+      </div>
+      <div class="check-row disabled">
+        <input type="checkbox" id="sell-fixed-target" disabled>
+        <label class="check-label" for="sell-fixed-target">固定目标收益率</label>
+        <span class="check-badge planned">待实现</span>
+      </div>
+      <div class="check-row disabled">
+        <input type="checkbox" id="sell-atr-tp" disabled>
+        <label class="check-label" for="sell-atr-tp">ATR倍数止盈</label>
+        <span class="check-badge planned">待实现</span>
+      </div>
+      <div class="check-row disabled">
+        <input type="checkbox" id="sell-time-stop" disabled>
+        <label class="check-label" for="sell-time-stop">时间止损</label>
+        <span class="check-badge planned">待实现</span>
+      </div>
+
+      <div style="color:var(--text-secondary);font-size:0.76rem;margin-top:8px">📝 卖出触发：止损（OR）AND/OR 止盈（OR）—— 先检查止损，再检查止盈</div>
+    </div>
+  </div>
+  <div class="config-grid" style="margin-top:18px">
+    <!-- ⑦ 仓位管理 -->
+    <div class="card">
+      <div class="card-title"><span class="icon">📐</span> ⑦ 持仓及仓位管理</div>
+      <div class="flex-row">
+        <div class="input-group"><label>单笔风险比例 (%)</label><input type="number" id="risk-pct" value="1" min="0.1" max="10" step="0.1"></div>
+      </div>
+      <div class="check-row" style="margin-top:10px">
+        <input type="checkbox" id="pos-risk-rule" checked>
+        <label class="check-label" for="pos-risk-rule">头寸规模 = 总资金 × 风险比例 ÷ (入场价 − 止损价)</label>
+        <span class="check-badge ready">已启用</span>
+      </div>
+      <div style="color:var(--text-secondary);font-size:0.76rem;margin-top:4px">📝 头寸按手取整 (A股 100股/手)，总资金以初始输入为基准不复利</div>
+    </div>
+    <!-- ⑧ 回测设置 -->
+    <div class="card">
+      <div class="card-title"><span class="icon">⏱️</span> ⑧ 回测设置</div>
+      <div class="input-group"><label>成交价模式</label><select id="execution-mode"><option value="close">当日收盘价</option><option value="next_open">次日开盘价</option></select></div>
+      <div style="color:var(--text-secondary);font-size:0.76rem;margin-top:8px">
+        <div>• 当日收盘价：信号触发日以收盘价成交</div>
+        <div>• 次日开盘价：信号触发日检测，次日开盘价成交，含隔夜缺口止损检查</div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:18px;text-align:center">
+    <button class="btn btn-primary btn-lg" id="analyze-btn">▶ 开始分析</button>
+  </div>
+</div>
+
+<!-- ===== 输出区 ===== -->
+
+<!-- ⑨ 绩效指标 -->
+<div class="card hidden" id="metrics-card">
+  <div class="card-title"><span class="icon">📊</span> ⑨ 绩效指标</div>
+  <div class="metrics-grid">
+    <div class="metric-item"><div class="metric-label">累计回报</div><div class="metric-value" id="metric-cumret">--</div></div>
+    <div class="metric-item"><div class="metric-label">最大回撤</div><div class="metric-value down" id="metric-mdd">--</div></div>
+    <div class="metric-item"><div class="metric-label">夏普比率</div><div class="metric-value" id="metric-sharpe">--</div></div>
+    <div class="metric-item"><div class="metric-label">总交易次数</div><div class="metric-value" id="metric-trades" style="color:var(--purple)">--</div></div>
+  </div>
+</div>
+
+<!-- ⑩ 策略图表 -->
+<div class="card hidden" id="chart-card">
+  <div class="card-title"><span class="icon">📈</span> ⑩ 策略图表</div>
+  <div id="chart-container"></div>
+</div>
+
+<!-- ⑪ 持仓 + 交易记录 -->
+<div class="card hidden" id="position-card">
+  <div class="card-title"><span class="icon">💼</span> ⑪ 持仓与交易记录</div>
+  <div class="account-summary" id="account-summary"></div>
+  <div style="font-size:0.84rem;font-weight:700;color:var(--text-secondary);margin-bottom:8px">📋 当前持仓（回测最后一日状态）</div>
+  <div class="table-wrap" id="position-table"><div class="empty-state">暂无持仓</div></div>
+  <div style="font-size:0.84rem;font-weight:700;color:var(--text-secondary);margin:16px 0 8px">📜 交易记录（时间倒序）</div>
+  <div class="table-wrap" id="trade-table"><div class="empty-state">暂无交易</div></div>
+</div>
+</div>
+
+<script>
+// ═══════════ UTILITIES ═══════════
+function calcSMA(data,w){const r=new Array(data.length).fill(null);let s=0;for(let i=0;i<data.length;i++){s+=data[i];if(i>=w)s-=data[i-w];if(i>=w-1)r[i]=s/w}return r}
+function calcATR(data,period){
+  const tr=new Array(data.length).fill(null),atr=new Array(data.length).fill(null);
+  for(let i=0;i<data.length;i++){
+    if(data[i].high==null||data[i].low==null||data[i].close==null)continue;
+    const prevC=i>0?data[i-1].close:data[i].close;
+    if(prevC==null)continue;
+    tr[i]=Math.max(data[i].high-data[i].low,Math.abs(data[i].high-prevC),Math.abs(data[i].low-prevC));
+  }
+  let sum=0;for(let i=0;i<data.length;i++){if(tr[i]!=null)sum+=tr[i];if(i>=period&&tr[i-period]!=null)sum-=tr[i-period];if(i>=period-1)atr[i]=sum/period}
+  return atr;
+}
+function parseDate(val){
+  if(val instanceof Date)return val;
+  if(typeof val==='number')return new Date((val-25569)*86400000);
+  const s=String(val).trim();
+  const m1=s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);if(m1)return new Date(+m1[1],+m1[2]-1,+m1[3]);
+  const m2=s.match(/^(\d{4})(\d{2})(\d{2})$/);if(m2)return new Date(+m2[1],+m2[2]-1,+m2[3]);
+  return new Date(s);
+}
+function formatDate(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function fmtMoney(v){return '¥'+Math.abs(v).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})}
+const COL_ALIASES={date:['date','trade_date','日期','交易日期','时间','time','day','dt'],open:['open','开盘价','开盘','open_price','o'],high:['high','最高价','最高','high_price','h'],low:['low','最低价','最低','low_price','l'],close:['close','收盘价','收盘','close_price','c','adj_close','复权收盘价'],volume:['volume','vol','成交量','成交','v']};
+function matchColumns(headers){const m={};for(const[k,aliases]of Object.entries(COL_ALIASES)){for(const alias of aliases){const idx=headers.findIndex(h=>String(h).toLowerCase().trim()===alias.toLowerCase());if(idx>=0){m[k]=idx;break}}}return{mapping:m,missing:Object.keys(COL_ALIASES).filter(k=>!(k in m))}}
+
+// ═══════════ STATE ═══════════
+const state={rawData:[],filteredData:[],currentModel:'dual_ma',chart:null,backtestResult:null};
+const $=id=>document.getElementById(id);
+
+// ═══════════ CONDITION TOGGLES (v4.3) ═══════════
+function toggleAtrParams(){
+  const el=$('atr-params');el.classList.toggle('collapsed',!$('sell-atr-stop').checked);
+}
+function toggleDeathCrossParams(){
+  const el=$('death-cross-params');el.classList.toggle('collapsed',!$('sell-death-cross').checked);
+}
+
+// ═══════════ MODEL REGISTRY ═══════════
+const MODEL_REGISTRY={
+  'dual_ma':{
+    name:'双均线交叉 (MA Crossover)',
+    params:[
+      {key:'short_window',label:'短期均线周期',type:'number',min:2,max:60,default:5},
+      {key:'long_window',label:'长期均线周期',type:'number',min:2,max:120,default:10},
+    ],
+    analyze(data,params){
+      const closes=data.map(d=>d.close),dates=data.map(d=>d.dateStr);
+      const maShort=calcSMA(closes,params.short_window),maLong=calcSMA(closes,params.long_window);
+      const signals=[];
+      for(let i=1;i<closes.length;i++){
+        if(maShort[i]==null||maLong[i]==null||maShort[i-1]==null||maLong[i-1]==null)continue;
+        if(maShort[i-1]<=maLong[i-1]&&maShort[i]>maLong[i])signals.push({type:'golden_cross',label:'金叉',date:dates[i],index:i,price:closes[i]});
+        else if(maShort[i-1]>=maLong[i-1]&&maShort[i]<maLong[i])signals.push({type:'death_cross',label:'死叉',date:dates[i],index:i,price:closes[i]});
+      }
+      return{maShort,maLong,signals};
+    },
+    getChartSeries(result,dates,closes,params){
+      return[
+        {name:'收盘价',type:'line',data:closes,smooth:false,symbol:'none',lineStyle:{width:1.5,color:'#34495e'},z:1},
+        {name:`MA${params.short_window}`,type:'line',data:result.maShort,smooth:false,symbol:'none',lineStyle:{width:2,color:'#e74c3c'},z:2},
+        {name:`MA${params.long_window}`,type:'line',data:result.maLong,smooth:false,symbol:'none',lineStyle:{width:2,color:'#3498db'},z:2},
+        {name:'金叉',type:'scatter',symbolSize:12,symbol:'triangle',data:result.signals.filter(s=>s.type==='golden_cross').map(s=>[s.date,s.price]),itemStyle:{color:'#e74c3c'},z:8},
+        {name:'死叉',type:'scatter',symbolSize:12,symbol:'triangle',symbolRotate:180,data:result.signals.filter(s=>s.type==='death_cross').map(s=>[s.date,s.price]),itemStyle:{color:'#27ae60'},z:8},
+      ];
+    },
+    getSignalStats(result){return[{type:'golden_cross',label:'金叉(买入信号)',count:result.signals.filter(s=>s.type==='golden_cross').length},{type:'death_cross',label:'死叉(卖出信号)',count:result.signals.filter(s=>s.type==='death_cross').length}]},
+    getChartTitle(params){return `双均线策略 — MA${params.short_window} / MA${params.long_window}`},
+  },
+  'macd':{name:'MACD (待实现)',placeholder:true,params:[{key:'fast',label:'快线周期',type:'number',min:5,max:20,default:12},{key:'slow',label:'慢线周期',type:'number',min:20,max:40,default:26},{key:'signal',label:'信号线周期',type:'number',min:5,max:15,default:9}],analyze(){return{maShort:[],maLong:[],signals:[]}},getChartSeries(){return[]},getSignalStats(){return[]},getChartTitle(){return'MACD (待实现)'}},
+  'bollinger':{name:'布林带 Bollinger Bands (待实现)',placeholder:true,params:[{key:'period',label:'周期',type:'number',min:10,max:50,default:20},{key:'stddev',label:'标准差倍数',type:'number',min:1,max:3,step:0.5,default:2}],analyze(){return{maShort:[],maLong:[],signals:[]}},getChartSeries(){return[]},getSignalStats(){return[]},getChartTitle(){return'布林带 (待实现)'}},
+  'rsi':{name:'RSI 相对强弱指标 (待实现)',placeholder:true,params:[{key:'period',label:'周期',type:'number',min:5,max:30,default:14},{key:'overbought',label:'超买阈值',type:'number',min:60,max:90,default:70},{key:'oversold',label:'超卖阈值',type:'number',min:10,max:40,default:30}],analyze(){return{maShort:[],maLong:[],signals:[]}},getChartSeries(){return[]},getSignalStats(){return[]},getChartTitle(){return'RSI (待实现)'}},
+};
+
+// ═══════════ INIT ═══════════
+function init(){
+  const sel=$('model-select');
+  for(const[key,model]of Object.entries(MODEL_REGISTRY)){const o=document.createElement('option');o.value=key;o.textContent=model.name;if(key===state.currentModel)o.selected=true;sel.appendChild(o)}
+  sel.addEventListener('change',onModelChange);
+  renderParamPanel();
+
+  const zone=$('upload-zone'),input=$('file-input');
+  zone.addEventListener('click',()=>input.click());
+  input.addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0])});
+  zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('dragover')});
+  zone.addEventListener('dragleave',()=>zone.classList.remove('dragover'));
+  zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('dragover');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0])});
+
+  $('analyze-btn').addEventListener('click',runAnalysis);
+  $('date-range-select').addEventListener('change',()=>{if(state.rawData.length>0){filterByDateRange();if(state.filteredData.length>0)updateDiagnostics()}});
+  window.addEventListener('resize',()=>state.chart?.resize());
+}
+function onModelChange(){state.currentModel=$('model-select').value;renderParamPanel();const model=MODEL_REGISTRY[state.currentModel];$('analyze-btn').disabled=model.placeholder||false}
+function renderParamPanel(){
+  const model=MODEL_REGISTRY[state.currentModel],panel=$('param-panel');panel.innerHTML='';
+  for(const p of model.params){
+    const step=p.step||1,g=document.createElement('div');g.className='input-group';
+    g.innerHTML=`<label>${p.label}</label><input type="number" id="param-${p.key}" min="${p.min}" max="${p.max}" value="${p.default}" step="${step}">`;
+    panel.appendChild(g);
+  }
+  $('analyze-btn').disabled=model.placeholder||false;
+}
+function getParams(){const model=MODEL_REGISTRY[state.currentModel],p={};for(const q of model.params){const el=$('param-'+q.key);p[q.key]=el?parseFloat(el.value)||q.default:q.default}return p}
+
+// ═══════════ GET CONFIG (v4.3: 读取复选框) ═══════════
+function getConfig(){
+  return{
+    capital:parseFloat($('capital-input').value)||100000,
+    riskPct:parseFloat($('risk-pct').value)||1,
+    // Buy conditions
+    buyGoldenCross:$('buy-golden-cross').checked,
+    // Trend filters
+    filterAboveMA:$('filter-above-ma').checked,
+    filterMARising:$('filter-ma-rising').checked,
+    // Sell — stop loss
+    sellATRStop:$('sell-atr-stop').checked,
+    atrMultiplier:parseFloat($('atr-multiplier').value)||2,
+    atrPeriod:parseInt($('atr-period').value)||14,
+    // Sell — take profit
+    sellDeathCross:$('sell-death-cross').checked,
+    exitMode:$('exit-mode').value,
+    // Execution
+    executionMode:$('execution-mode').value,
+  };
+}
+
+// ═══════════ FILE HANDLING ═══════════
+function handleFile(file){
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'}),ws=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+      if(rows.length<2){alert('文件数据不足');return}
+      const headers=rows[0],{mapping,missing}=matchColumns(headers);
+      if(missing.length>0){const critical=['date','close'].filter(r=>missing.includes(r));if(critical.length>0){alert(`无法匹配必要列: ${critical.join(', ')}。识别到的列名: ${headers.join(', ')}`);return}}
+      const dataRows=[];
+      for(let i=1;i<rows.length;i++){
+        const row=rows[i];if(!row||row.every(v=>v==null))continue;
+        const dv=mapping.date!=null?row[mapping.date]:null;if(dv==null)continue;
+        const d=parseDate(dv);if(isNaN(d.getTime()))continue;
+        const entry={date:d,dateStr:formatDate(d)};
+        if(mapping.open!=null)entry.open=parseFloat(row[mapping.open])||null;
+        if(mapping.high!=null)entry.high=parseFloat(row[mapping.high])||null;
+        if(mapping.low!=null)entry.low=parseFloat(row[mapping.low])||null;
+        if(mapping.close!=null)entry.close=parseFloat(row[mapping.close])||null;
+        if(mapping.volume!=null)entry.volume=parseFloat(row[mapping.volume])||null;
+        if(entry.close==null)continue;dataRows.push(entry);
+      }
+      if(dataRows.length<10){alert('有效数据行不足（至少10行）');return}
+      dataRows.sort((a,b)=>a.date-b.date);state.rawData=dataRows;
+      showPreview(dataRows);
+      $('file-info').classList.remove('hidden');$('file-info').innerHTML=`✅ 成功加载 <strong>${dataRows.length}</strong> 条记录 | 日期范围: ${dataRows[0].dateStr} — ${dataRows[dataRows.length-1].dateStr}`;
+      $('date-range-row').classList.remove('hidden');$('config-area').classList.remove('hidden');
+      filterByDateRange();
+      $('diag-card').classList.remove('hidden');updateDiagnostics();
+    }catch(err){alert('文件解析失败: '+err.message);console.error(err)}
+  };
+  reader.readAsArrayBuffer(file);
+}
+function showPreview(data){
+  const preview=data.slice(0,5);if(preview.length===0)return;
+  const keys=Object.keys(preview[0]).filter(k=>k!=='date');
+  let h='<table><thead><tr><th>日期</th>';for(const k of keys)h+=`<th>${k}</th>`;h+='</tr></thead><tbody>';
+  for(const row of preview){h+='<tr><td>'+row.dateStr+'</td>';for(const k of keys)h+='<td>'+(row[k]!=null?(typeof row[k]==='number'?row[k].toFixed(2):row[k]):'-')+'</td>';h+='</tr>'}
+  h+='</tbody></table>';$('preview-table').innerHTML=h;$('preview-block').classList.remove('hidden');
+}
+function filterByDateRange(){
+  const years=parseInt($('date-range-select').value),latest=state.rawData[state.rawData.length-1].date,cutoff=new Date(latest);
+  cutoff.setFullYear(cutoff.getFullYear()-years);
+  state.filteredData=state.rawData.filter(d=>d.date>=cutoff);
+}
+
+// ═══════════ DIAGNOSTICS ═══════════
+function updateDiagnostics(){
+  const data=state.filteredData,n=data.length;
+  const closes=data.map(d=>d.close),opens=data.map(d=>d.open),highs=data.map(d=>d.high),lows=data.map(d=>d.low),vols=data.map(d=>d.volume);
+  $('diag-days').textContent=n;
+  $('diag-range').textContent=data[0].dateStr+' — '+data[n-1].dateStr;
+  const priceMin=Math.min(...closes.filter(v=>v!=null)),priceMax=Math.max(...closes.filter(v=>v!=null));
+  $('diag-price-range').textContent='¥'+priceMin.toFixed(2)+' — ¥'+priceMax.toFixed(2);
+  const rangeRet=closes[n-1]!=null&&closes[0]!=null?((closes[n-1]-closes[0])/closes[0]*100):0;
+  $('diag-return').textContent=(rangeRet>=0?'+':'')+rangeRet.toFixed(2)+'%';
+  $('diag-return').className='metric-value '+(rangeRet>=0?'up':'down');
+  let missing=0;for(const d of data)if(d.close==null)missing++;
+  $('diag-missing').textContent=missing;$('diag-missing').style.color=missing===0?'var(--green)':'var(--accent)';
+  let ohlcErr=0;for(const d of data){if(d.high!=null&&d.low!=null&&d.open!=null&&d.close!=null){if(d.high<d.low||d.high<d.open||d.high<d.close||d.low>d.open||d.low>d.close)ohlcErr++}}
+  $('diag-ohlc-err').textContent=ohlcErr;$('diag-ohlc-err').style.color=ohlcErr===0?'var(--green)':'var(--accent)';
+  let anomaly=0;for(let i=1;i<n;i++){if(closes[i]!=null&&closes[i-1]!=null){if(Math.abs((closes[i]-closes[i-1])/closes[i-1]*100)>5)anomaly++}}
+  $('diag-anomaly').textContent=anomaly;
+  const calDays=Math.round((data[n-1].date-data[0].date)/86400000);
+  $('diag-gap').textContent=Math.max(0,calDays-(n-1))+' 天';
+  const dailyRets=[];for(let i=1;i<n;i++){if(closes[i]!=null&&closes[i-1]!=null)dailyRets.push((closes[i]-closes[i-1])/closes[i-1]*100)}
+  if(dailyRets.length>0){
+    const meanRet=dailyRets.reduce((a,b)=>a+b,0)/dailyRets.length,variance=dailyRets.reduce((s,r)=>s+(r-meanRet)**2,0)/dailyRets.length,stdRet=Math.sqrt(variance);
+    $('diag-daily-ret').textContent=(meanRet>=0?'+':'')+meanRet.toFixed(2)+'%';$('diag-daily-ret').style.color=meanRet>=0?'var(--accent)':'var(--green)';
+    $('diag-daily-vol').textContent=stdRet.toFixed(2)+'%';$('diag-annual-vol').textContent=(stdRet*Math.sqrt(243)).toFixed(2)+'%';
+    $('diag-extreme').innerHTML='<span style="color:var(--accent)">+'+Math.max(...dailyRets).toFixed(2)+'%</span> / <span style="color:var(--green)">'+Math.min(...dailyRets).toFixed(2)+'%</span>';
+  }
+  const validVols=vols.filter(v=>v!=null);
+  if(validVols.length>0){
+    const avgVol=validVols.reduce((a,b)=>a+b,0)/validVols.length;let vu='',vd=avgVol;
+    if(avgVol>=1e8){vd=avgVol/1e8;vu='亿'}else if(avgVol>=1e4){vd=avgVol/1e4;vu='万'}
+    $('diag-avg-vol').textContent=vd.toFixed(2)+' '+vu+'股';
+    let maxVolIdx=0;for(let i=0;i<vols.length;i++){if(vols[i]!=null&&vols[i]>(vols[maxVolIdx]||0))maxVolIdx=i}
+    $('diag-max-vol-day').textContent=data[maxVolIdx].dateStr;
+    let up=0,down=0;for(const r of dailyRets){if(r>0)up++;else if(r<0)down++}
+    $('diag-updown-ratio').textContent=up+' : '+down;$('diag-updown-ratio').style.color=up>=down?'var(--accent)':'var(--green)';
+    let mu=0,md=0,cu=0,cd=0;for(const r of dailyRets){if(r>0){cu++;cd=0;mu=Math.max(mu,cu)}else if(r<0){cd++;cu=0;md=Math.max(md,cd)}else{cu=0;cd=0}}
+    $('diag-streak').innerHTML='<span style="color:var(--accent)">涨 '+mu+'天</span> / <span style="color:var(--green)">跌 '+md+'天</span>';
+  }
+}
+
+// ═══════════ BACKTEST ENGINE (v4.3: 按复选框条件执行) ═══════════
+function runBacktest(data,signals,atr,maShort,maLong,config){
+  const{capital,riskPct,atrMultiplier,exitMode,executionMode,
+    buyGoldenCross,filterAboveMA,filterMARising,
+    sellATRStop,sellDeathCross}=config;
+  let cash=capital,positions=[],trades=[],pendingOrders=[],dailyEquity=[],nextPosId=1;
+
+  function addTrade(date,type,price,shares,amount,pnl,reason){trades.push({date,type,price,shares,amount,pnl,reason})}
+  function execBuy(day,price,sigDay){
+    if(!sellATRStop||atr[sigDay]==null)return; // ATR止损未启用则无法计算止损价，跳过建仓
+    const sl=price-atrMultiplier*atr[sigDay],riskPerShare=price-sl;
+    if(riskPerShare<=0)return;
+    const rawShares=(capital*riskPct/100)/riskPerShare,shares=Math.floor(rawShares/100)*100;
+    if(shares<=0)return;
+    const cost=shares*price;if(cost>cash)return;
+    cash-=cost;
+    positions.push({id:nextPosId++,entryDate:day.dateStr,entryPrice:price,shares,stopLoss:sl,atrAtEntry:atr[sigDay]});
+    addTrade(day.dateStr,'买入',price,shares,cost,null,'金叉买入');
+  }
+
+  for(let t=0;t<data.length;t++){
+    const day=data[t];
+
+    // 0. 处理隔日委托 + 隔夜缺口 (next_open)
+    if(executionMode==='next_open'){
+      if(pendingOrders.length>0){
+        const sells=[],buys=[];
+        for(const o of pendingOrders){if(o.action==='sell')sells.push(o);else buys.push(o)}
+        for(const o of sells){
+          const sp=day.open;
+          if(o.posIds==='all'){
+            for(const pos of positions){const rev=pos.shares*sp,pnl=(sp-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,o.reason==='ATR止损'?'止损卖出':(o.reason.includes('减仓')?'止盈减仓':'止盈卖出'),sp,pos.shares,rev,pnl,o.reason)}
+            positions=[];
+          }else if(o.posIds==='fifo'){
+            if(positions.length>0){const pos=positions[0],rev=pos.shares*sp,pnl=(sp-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止盈减仓',sp,pos.shares,rev,pnl,o.reason);positions.shift()}
+          }else{
+            const idsToSell=new Set(o.posIds),remaining=[];
+            for(const pos of positions){if(idsToSell.has(pos.id)){const rev=pos.shares*sp,pnl=(sp-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止损卖出',sp,pos.shares,rev,pnl,o.reason)}else remaining.push(pos)}
+            positions=remaining;
+          }
+        }
+        for(const o of buys)execBuy(day,day.open,o.signalDay);
+        pendingOrders=[];
+        // Overnight gap stop
+        if(day.open!=null&&sellATRStop){const stopped=[],alive=[];for(const pos of positions){if(day.open<=pos.stopLoss){const rev=pos.shares*day.open,pnl=(day.open-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止损卖出',day.open,pos.shares,rev,pnl,'ATR止损(隔空)')}else alive.push(pos)}positions=alive}
+      }else{
+        // 无委托但有持仓，检查隔夜缺口
+        if(day.open!=null&&sellATRStop){const stopped=[],alive=[];for(const pos of positions){if(day.open<=pos.stopLoss){const rev=pos.shares*day.open,pnl=(day.open-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止损卖出',day.open,pos.shares,rev,pnl,'ATR止损(隔空)')}else alive.push(pos)}positions=alive}
+      }
+    }
+
+    if(maShort[t]==null||maLong[t]==null){const posVal=positions.reduce((s,p)=>s+p.shares*day.close,0);dailyEquity.push(cash+posVal);continue}
+
+    // 1. Check exits — STOP LOSS (v4.3: only if enabled)
+    if(sellATRStop){
+      const stoppedPositions=positions.filter(p=>day.close<=p.stopLoss);
+      if(stoppedPositions.length>0){
+        if(executionMode==='close'){
+          for(const pos of stoppedPositions){const rev=pos.shares*day.close,pnl=(day.close-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止损卖出',day.close,pos.shares,rev,pnl,'ATR止损')}
+          const idsToRemove=new Set(stoppedPositions.map(p=>p.id));positions=positions.filter(p=>!idsToRemove.has(p.id))
+        }else{pendingOrders.push({action:'sell',posIds:stoppedPositions.map(p=>p.id),reason:'ATR止损'})}
+      }
+    }
+
+    // 2. Check exits — TAKE PROFIT (v4.3: only if enabled)
+    if(sellDeathCross){
+      const isDeathCross=signals.some(s=>s.index===t&&s.type==='death_cross');
+      if(isDeathCross&&positions.length>0){
+        if(executionMode==='close'){
+          if(exitMode==='all'){for(const pos of positions){const rev=pos.shares*day.close,pnl=(day.close-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止盈卖出',day.close,pos.shares,rev,pnl,'死叉止盈')}positions=[]}
+          else{if(positions.length>0){const pos=positions[0],rev=pos.shares*day.close,pnl=(day.close-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止盈减仓',day.close,pos.shares,rev,pnl,'死叉减仓');positions.shift()}}
+        }else{pendingOrders.push({action:'sell',posIds:exitMode,reason:exitMode==='all'?'死叉止盈':'死叉减仓'})}
+      }
+    }
+
+    // 3. Check entries — BUY SIGNAL + TREND FILTER (v4.3: checkbox-based)
+    // Buy signal: OR logic
+    let buySignal=false;
+    if(buyGoldenCross){const isGold=signals.some(s=>s.index===t&&s.type==='golden_cross');if(isGold)buySignal=true}
+    // (future: macd_cross, rsi_oversold, volume_breakout...)
+
+    // Trend filter: AND logic
+    let trendOk=true;
+    let anyFilterActive=false;
+    if(filterAboveMA){anyFilterActive=true;if(!(day.close>maLong[t]))trendOk=false}
+    if(filterMARising){anyFilterActive=true;if(!(t>0&&maShort[t-1]!=null&&maShort[t]>maShort[t-1]))trendOk=false}
+    // If no filters are active, trend passes by default (裸信号策略)
+
+    if(buySignal&&trendOk){
+      if(executionMode==='close')execBuy(day,day.close,t);
+      else pendingOrders.push({action:'buy',signalDay:t,reason:'金叉买入'});
+    }
+
+    // 4. Update P&L
+    const posVal=positions.reduce((s,p)=>s+p.shares*day.close,0);dailyEquity.push(cash+posVal);
+  }
+
+  // Performance metrics
+  if(dailyEquity.length===0)return{positions,trades,dailyEquity:[capital],cumulativeReturn:0,maxDrawdown:0,sharpeRatio:0,totalTrades:0,cash,finalEquity:capital};
+  const finalEquity=dailyEquity[dailyEquity.length-1],cumRet=(finalEquity-capital)/capital*100;
+  let peak=dailyEquity[0],mdd=0;for(const eq of dailyEquity){if(eq>peak)peak=eq;mdd=Math.min(mdd,(eq-peak)/peak*100)}
+  const dRets=[];for(let i=1;i<dailyEquity.length;i++){if(dailyEquity[i-1]!==0)dRets.push((dailyEquity[i]-dailyEquity[i-1])/Math.abs(dailyEquity[i-1]))}
+  const meanR=dRets.length>0?dRets.reduce((a,b)=>a+b,0)/dRets.length:0,stdR=dRets.length>0?Math.sqrt(dRets.reduce((s,r)=>s+(r-meanR)**2,0)/dRets.length):1;
+  const sharpe=stdR>0?(meanR-0.03/243)/stdR*Math.sqrt(243):0;
+  const buyCt=trades.filter(t=>t.type==='买入').length,sellCt=trades.filter(t=>t.type!=='买入').length;
+  return{positions,trades,dailyEquity,cumulativeReturn:cumRet,maxDrawdown:mdd,sharpeRatio:sharpe,totalTrades:Math.min(buyCt,sellCt),cash,finalEquity};
+}
+
+// ═══════════ ANALYSIS ═══════════
+function runAnalysis(){
+  if(state.filteredData.length<10){alert('数据不足，至少需要10个交易日');return}
+  const model=MODEL_REGISTRY[state.currentModel];if(model.placeholder){alert('该模型尚未实现');return}
+  const params=getParams(),config=getConfig();
+  if(config.capital<=0){alert('请输入有效的投资金额');return}
+
+  // Validate: at least one buy signal enabled
+  if(!config.buyGoldenCross){alert('请至少勾选一个买入信号条件');return}
+  // Validate: if ATR stop is enabled but no sell conditions that need it...
+  // Warn if no exit conditions at all
+  if(!config.sellATRStop&&!config.sellDeathCross){if(!confirm('⚠️ 未启用任何卖出条件（止损和止盈均关闭），持仓将永远不退出。继续？'))return}
+
+  const result=model.analyze(state.filteredData,params);
+  const atr=calcATR(state.filteredData,config.atrPeriod);
+  const bt=runBacktest(state.filteredData,result.signals,atr,result.maShort,result.maLong,config);
+  state.backtestResult=bt;state.lastResult=result;
+
+  // Show output area
+  $('metrics-card').classList.remove('hidden');$('chart-card').classList.remove('hidden');$('position-card').classList.remove('hidden');
+  if(!state.chart)state.chart=echarts.init($('chart-container'));
+
+  updateMetrics(bt);
+  renderChart(result,bt,params,config);
+  renderPositionPanel(bt,config);
+  setTimeout(()=>state.chart?.resize(),60);
+}
+
+function updateMetrics(bt){
+  $('metric-cumret').textContent=(bt.cumulativeReturn>=0?'+':'')+bt.cumulativeReturn.toFixed(2)+'%';
+  $('metric-cumret').className='metric-value '+(bt.cumulativeReturn>=0?'up':'down');
+  $('metric-mdd').textContent=bt.maxDrawdown.toFixed(2)+'%';
+  $('metric-sharpe').textContent=bt.sharpeRatio.toFixed(2);
+  $('metric-trades').textContent=bt.totalTrades;
+}
+
+// ═══════════ CHART ═══════════
+function renderChart(result,bt,params,config){
+  const data=state.filteredData,dates=data.map(d=>d.dateStr),closes=data.map(d=>d.close);
+  const model=MODEL_REGISTRY[state.currentModel];
+  let series=model.getChartSeries(result,dates,closes,params);
+
+  // Buy/Sell points
+  const buyPts=bt.trades.filter(t=>t.type==='买入').map(t=>({name:t.date,value:[t.date,t.price]}));
+  const sellPts=bt.trades.filter(t=>t.type!=='买入').map(t=>({name:t.date,value:[t.date,t.price]}));
+  series.push({name:'买入点',type:'scatter',symbolSize:16,symbol:'circle',data:buyPts.map(p=>p.value),itemStyle:{color:'#3498db',borderColor:'#fff',borderWidth:2},z:9});
+  series.push({name:'卖出点',type:'scatter',symbolSize:16,symbol:'circle',data:sellPts.map(p=>p.value),itemStyle:{color:'#8e44ad',borderColor:'#fff',borderWidth:2},z:9});
+
+  // Stop loss lines
+  if(config.sellATRStop){
+    const stopLines=[];
+    for(const pos of bt.positions){
+      const entryIdx=dates.indexOf(pos.entryDate);
+      const exitTrade=bt.trades.filter(t=>t.type!=='买入').find(t=>Math.abs(t.price-pos.entryPrice)<0.01||t.shares===pos.shares);
+      const exitIdx=exitTrade?dates.indexOf(exitTrade.date):dates.length-1;
+      if(entryIdx>=0&&exitIdx>=0){
+        for(let i=entryIdx;i<=exitIdx;i++){
+          if(!stopLines[i]||pos.stopLoss<stopLines[i])stopLines[i]=pos.stopLoss;
+        }
+      }
+    }
+    const slData=stopLines.length>0?new Array(dates.length).fill(null).map((_,i)=>stopLines[i]||null):null;
+    if(slData&&slData.some(v=>v!=null)){
+      series.push({name:'止损线',type:'line',data:slData,step:'start',symbol:'none',lineStyle:{type:'dashed',color:'#bbb',width:1},z:0.5});
+    }
+  }
+
+  state.chart.setOption({
+    title:{text:model.getChartTitle(params),left:'center',textStyle:{fontSize:14,fontWeight:700,color:'#2c3e50'}},
+    tooltip:{trigger:'axis',formatter:function(pts){let h='<strong>'+pts[0].axisValue+'</strong><br/>';for(const p of pts){if(p.seriesName==='买入点')h+='🔵 买入: ¥'+p.value[1].toFixed(2)+'<br/>';else if(p.seriesName==='卖出点')h+='🟣 卖出: ¥'+p.value[1].toFixed(2)+'<br/>';else if(p.value!=null&&!Array.isArray(p.value)&&p.seriesName!=='止损线')h+='<span style="color:'+p.color+'">● '+p.seriesName+': ¥'+p.value.toFixed(2)+'</span><br/>';}return h}},
+    legend:{data:series.filter(s=>!['买入点','卖出点','止损线'].includes(s.name)||s.data.length>0).map(s=>s.name),bottom:0,textStyle:{fontSize:10}},
+    grid:{left:60,right:40,top:50,bottom:40},
+    xAxis:{type:'category',data:dates,axisLabel:{formatter:v=>v.slice(5),fontSize:10,interval:Math.floor(dates.length/18)}},
+    yAxis:{type:'value',name:'价格 (¥)',scale:true,axisLabel:{fontSize:10}},
+    dataZoom:[{type:'inside',start:0,end:100},{type:'slider',start:0,end:100,height:24,bottom:30}],
+    series:series,
+  },true);
+}
+
+// ═══════════ POSITION & TRADE TABLES ═══════════
+function renderPositionPanel(bt,config){
+  const lastData=state.filteredData[state.filteredData.length-1];
+  const posVal=bt.positions.reduce((s,p)=>s+p.shares*lastData.close,0);
+  const totalEquity=bt.cash+posVal;
+  $('account-summary').innerHTML=
+    '<div class="as-item"><span class="as-label">初始资金</span><span class="as-value">'+fmtMoney(config.capital)+'</span></div>'+
+    '<div class="as-item"><span class="as-label">当前可用资金</span><span class="as-value">'+fmtMoney(bt.cash)+'</span></div>'+
+    '<div class="as-item"><span class="as-label">持仓市值</span><span class="as-value">'+fmtMoney(posVal)+'</span></div>'+
+    '<div class="as-item"><span class="as-label">总资产净值</span><span class="as-value" style="font-size:1.1rem">'+fmtMoney(totalEquity)+'</span></div>'+
+    '<div class="as-item"><span class="as-label">总收益率</span><span class="as-value" style="color:'+(bt.cumulativeReturn>=0?'var(--accent)':'var(--green)')+'">'+(bt.cumulativeReturn>=0?'+':'')+bt.cumulativeReturn.toFixed(2)+'%</span></div>';
+
+  // Position table
+  if(bt.positions.length===0){$('position-table').innerHTML='<div class="empty-state">✅ 所有持仓已平仓，无当前持仓</div>'}
+  else{
+    const lastClose=lastData.close;
+    let h='<table><thead><tr><th>建仓日期</th><th>方向</th><th>数量(股)</th><th>入场价</th><th>止损价</th><th>当前价</th><th>持仓盈亏</th><th>盈亏%</th></tr></thead><tbody>';
+    let totalPnl=0;
+    for(const pos of bt.positions){
+      const pnl=(lastClose-pos.entryPrice)*pos.shares,pnlPct=(lastClose/pos.entryPrice-1)*100;totalPnl+=pnl;
+      h+='<tr><td>'+pos.entryDate+'</td><td>多头</td><td>'+pos.shares+'</td><td>¥'+pos.entryPrice.toFixed(2)+'</td><td>¥'+pos.stopLoss.toFixed(2)+'</td><td>¥'+lastClose.toFixed(2)+'</td><td class="'+(pnl>=0?'pnl-up':'pnl-down')+'">'+(pnl>=0?'+':'')+'¥'+pnl.toFixed(2)+'</td><td class="'+(pnlPct>=0?'pnl-up':'pnl-down')+'">'+(pnlPct>=0?'+':'')+pnlPct.toFixed(2)+'%</td></tr>';
+    }
+    h+='<tr style="font-weight:700;background:#f0f4ff"><td colspan="6" style="text-align:right">合计</td><td class="'+(totalPnl>=0?'pnl-up':'pnl-down')+'">'+(totalPnl>=0?'+':'')+'¥'+totalPnl.toFixed(2)+'</td><td></td></tr>';
+    h+='</tbody></table>';$('position-table').innerHTML=h;
+  }
+
+  // Trade log
+  if(bt.trades.length===0){$('trade-table').innerHTML='<div class="empty-state">暂无交易记录</div>';return}
+  const sortedTrades=[...bt.trades].reverse();
+  let h='<table><thead><tr><th>日期</th><th>类型</th><th>价格</th><th>数量</th><th>金额</th><th>盈亏</th><th>触发原因</th></tr></thead><tbody>';
+  for(const t of sortedTrades){
+    let typeCls='';if(t.type==='买入')typeCls='signal-gold';else if(t.type.includes('止损'))typeCls='signal-death';else typeCls='';
+    h+='<tr><td>'+t.date+'</td><td class="'+typeCls+'">'+t.type+'</td><td>¥'+t.price.toFixed(2)+'</td><td>'+t.shares+'</td><td>¥'+(t.amount||0).toFixed(2)+'</td><td>'+(t.pnl!=null?((t.pnl>=0?'+':'')+'¥'+t.pnl.toFixed(2)):'-')+'</td><td>'+t.reason+'</td></tr>';
+  }
+  h+='</tbody></table>';$('trade-table').innerHTML=h;
+}
+
+document.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>
