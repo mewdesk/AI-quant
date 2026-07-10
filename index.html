@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>量化策略分析平台 v4.3 — 多模型交易系统</title>
+<title>量化策略分析平台 v5.0 — 多模型交易系统</title>
 <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/echarts@5.5.1/dist/echarts.min.js"></script>
 <style>
 :root {
   --bg: #f8f9fb; --card-bg: #ffffff; --text: #2c3e50; --text-secondary: #7f8c8d;
   --border: #e8ecf1; --accent: #e74c3c; --green: #27ae60; --blue: #3498db;
-  --purple: #8e44ad; --orange: #e67e22;
+  --purple: #8e44ad; --orange: #e67e22; --cyan: #00bcd4;
   --warning-bg: #fff3cd; --warning-border: #ffc107;
   --success-bg: #eaf7ea; --disabled-bg: #f1f3f5; --disabled-text: #bdc3c7;
   --radius: 10px; --shadow: 0 2px 12px rgba(0,0,0,0.06);
@@ -52,7 +52,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .input-group input[type="number"]{width:120px}
 .input-group select{min-width:140px;cursor:pointer;background:#fff}
 
-/* Checkbox styling */
 .check-row{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:6px;margin-bottom:4px;font-size:0.83rem;background:#fafbfc;transition:background .15s}
 .check-row:hover{background:#eef5fb}
 .check-row input[type="checkbox"]{width:16px;height:16px;cursor:pointer;accent-color:var(--blue);flex-shrink:0}
@@ -60,11 +59,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .check-row .check-badge{font-size:0.68rem;padding:1px 8px;border-radius:10px;font-weight:600;white-space:nowrap;flex-shrink:0}
 .check-badge.ready{background:#eaf7ea;color:#256029}
 .check-badge.planned{background:var(--disabled-bg);color:var(--disabled-text)}
-.check-row.disabled{opacity:0.55;cursor:not-allowed}
+.check-badge.new{background:#e3f2fd;color:#1565c0}
+.check-row.disabled{opacity:0.45;cursor:not-allowed}
 .check-row.disabled input[type="checkbox"]{cursor:not-allowed}
 .check-row.disabled .check-label{cursor:not-allowed}
 .cond-detail{padding:4px 0 4px 26px;font-size:0.76rem;color:var(--text-secondary);min-height:0;overflow:hidden;transition:all .2s}
 .cond-detail.collapsed{max-height:0;padding-top:0;padding-bottom:0;opacity:0}
+.param-hint{font-size:0.72rem;color:#999;margin-top:2px}
+
+.turtle-param-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.turtle-param-row input[type="checkbox"]{width:16px;height:16px;cursor:pointer;accent-color:var(--blue)}
+.turtle-param-row input[type="number"]{width:70px;padding:5px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.85rem}
+.turtle-param-row label{font-size:0.82rem;font-weight:600;color:var(--text)}
+.turtle-param-row .unit{font-size:0.78rem;color:var(--text-secondary)}
+.turtle-param-row .hint{font-size:0.72rem;color:#f39c12}
+.turtle-param-row.disabled{opacity:0.45;pointer-events:none}
 
 .btn{padding:9px 22px;border:none;border-radius:6px;font-size:0.88rem;font-weight:600;cursor:pointer;transition:all .2s}
 .btn-primary{background:var(--blue);color:#fff}
@@ -80,8 +89,11 @@ table td{padding:7px 12px;border-bottom:1px solid #f1f3f5}
 table tr:hover td{background:#fafbfc}
 .signal-gold{color:var(--accent);font-weight:700}
 .signal-death{color:var(--green);font-weight:700}
+.signal-pyramid{color:var(--orange);font-weight:700}
 .pnl-up{color:var(--accent);font-weight:600}
 .pnl-down{color:var(--green);font-weight:600}
+.sys-short{color:var(--accent);font-weight:600}
+.sys-long{color:var(--blue);font-weight:600}
 .account-summary{background:linear-gradient(135deg,#f0f4ff,#fafbfc);border:1px solid #c8d6e5;border-radius:8px;padding:14px 18px;margin-bottom:14px;display:flex;gap:24px;flex-wrap:wrap;font-size:0.84rem}
 .account-summary .as-item{display:flex;flex-direction:column}
 .account-summary .as-label{color:var(--text-secondary);font-size:0.74rem}
@@ -98,7 +110,7 @@ table tr:hover td{background:#fafbfc}
 </head>
 <body>
 
-<div class="header"><h1>📈 量化策略分析平台</h1><span class="badge">v4.3 · 多模型交易系统</span></div>
+<div class="header"><h1>📈 量化策略分析平台</h1><span class="badge">v5.0 · 多模型交易系统</span></div>
 
 <div class="container">
 <!-- ===== 配置区 ===== -->
@@ -167,11 +179,11 @@ table tr:hover td{background:#fafbfc}
       <div class="flex-row">
         <div class="input-group"><label>选择模型</label><select id="model-select"></select></div>
       </div>
-      <div class="flex-row" id="param-panel" style="margin-top:10px"></div>
+      <div id="param-panel" style="margin-top:10px"></div>
     </div>
   </div>
   <div class="config-grid" style="margin-top:18px">
-    <!-- ⑤ 买入管理 (v4.3: 复选框版) -->
+    <!-- ⑤ 买入管理 -->
     <div class="card">
       <div class="card-title"><span class="icon">🟢</span> ⑤ 买入管理</div>
 
@@ -180,6 +192,11 @@ table tr:hover td{background:#fafbfc}
         <input type="checkbox" id="buy-golden-cross" checked>
         <label class="check-label" for="buy-golden-cross">金叉（短期均线上穿长期均线）</label>
         <span class="check-badge ready">已实现</span>
+      </div>
+      <div class="check-row">
+        <input type="checkbox" id="buy-donchian-breakout">
+        <label class="check-label" for="buy-donchian-breakout">唐奇安通道突破（收盘价突破通道上轨）</label>
+        <span class="check-badge new">v5.0</span>
       </div>
       <div class="check-row disabled">
         <input type="checkbox" id="buy-macd-cross" disabled>
@@ -198,6 +215,11 @@ table tr:hover td{background:#fafbfc}
       </div>
 
       <div style="font-size:0.8rem;font-weight:700;color:var(--text-secondary);margin:10px 0 6px">🔍 趋势过滤 <span style="font-weight:400;font-size:0.74rem">（AND 关系，所有勾选条件同时满足才放行）</span></div>
+      <div class="check-row">
+        <input type="checkbox" id="filter-none" onchange="toggleNoneFilter()">
+        <label class="check-label" for="filter-none">无（不做约束）</label>
+        <span class="check-badge new">v5.0</span>
+      </div>
       <div class="check-row">
         <input type="checkbox" id="filter-above-ma" checked>
         <label class="check-label" for="filter-above-ma">价格在长期均线之上（close > MA_long）</label>
@@ -222,7 +244,7 @@ table tr:hover td{background:#fafbfc}
       <div style="color:var(--text-secondary);font-size:0.76rem;margin-top:8px">📝 买入触发 = 买入信号（OR）AND 趋势过滤（AND）</div>
     </div>
 
-    <!-- ⑥ 卖出管理 (v4.3: 复选框版) -->
+    <!-- ⑥ 卖出管理 -->
     <div class="card">
       <div class="card-title"><span class="icon">🔴</span> ⑥ 卖出管理</div>
 
@@ -238,6 +260,16 @@ table tr:hover td{background:#fafbfc}
           <div class="input-group"><label>ATR 倍数</label><input type="number" id="atr-multiplier" value="2" min="0.5" max="5" step="0.5"></div>
         </div>
         <div style="color:var(--text-secondary);margin-top:4px">每个子仓位独立维护止损价（入场时锁定），当日收盘价 ≤ 止损价 → 触发</div>
+        <div class="check-row" style="margin-top:6px">
+          <input type="checkbox" id="sell-pyramid-stop" onchange="togglePyramidStopParams()">
+          <label class="check-label" for="sell-pyramid-stop">加仓后止损上移 — 每次加仓，该系统所有持仓止损价上移 系数×ATR</label>
+          <span class="check-badge new">v5.0</span>
+        </div>
+        <div class="cond-detail collapsed" id="pyramid-stop-params" style="padding-left:26px">
+          <div class="flex-row">
+            <div class="input-group"><label>上移系数 (×ATR)</label><input type="number" id="pyramid-stop-coeff" value="0.5" min="0.1" max="2" step="0.1"></div>
+          </div>
+        </div>
       </div>
       <div class="check-row disabled">
         <input type="checkbox" id="sell-trailing" disabled>
@@ -258,6 +290,11 @@ table tr:hover td{background:#fafbfc}
       </div>
       <div class="cond-detail" id="death-cross-params">
         <div class="input-group"><label>止盈方式</label><select id="exit-mode"><option value="all">全部平仓</option><option value="fifo">减仓FIFO（平最早那笔）</option></select></div>
+      </div>
+      <div class="check-row">
+        <input type="checkbox" id="sell-donchian-exit">
+        <label class="check-label" for="sell-donchian-exit">唐奇安反向突破（收盘价跌破通道下轨 → 平该系统全部持仓）</label>
+        <span class="check-badge new">v5.0</span>
       </div>
       <div class="check-row disabled">
         <input type="checkbox" id="sell-fixed-target" disabled>
@@ -286,11 +323,22 @@ table tr:hover td{background:#fafbfc}
         <div class="input-group"><label>单笔风险比例 (%)</label><input type="number" id="risk-pct" value="1" min="0.1" max="10" step="0.1"></div>
       </div>
       <div class="check-row" style="margin-top:10px">
-        <input type="checkbox" id="pos-risk-rule" checked>
-        <label class="check-label" for="pos-risk-rule">头寸规模 = 总资金 × 风险比例 ÷ (入场价 − 止损价)</label>
+        <input type="checkbox" id="pos-risk-rule" checked disabled>
+        <label class="check-label" for="pos-risk-rule">头寸规模 = 总资金 × 风险比例 ÷ (ATR倍数 × ATR)</label>
         <span class="check-badge ready">已启用</span>
       </div>
       <div style="color:var(--text-secondary);font-size:0.76rem;margin-top:4px">📝 头寸按手取整 (A股 100股/手)，总资金以初始输入为基准不复利</div>
+
+      <!-- 海龟金字塔参数 (v5.0) -->
+      <div id="turtle-pos-params" class="hidden" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+        <div style="font-size:0.8rem;font-weight:700;color:var(--text-secondary);margin-bottom:8px">🐢 海龟金字塔加仓 <span class="check-badge new" style="margin-left:4px">v5.0</span></div>
+        <div class="flex-row">
+          <div class="input-group"><label>金字塔加仓间距 (×ATR)</label><input type="number" id="pyramid-interval" value="0.5" min="0.1" max="2" step="0.1"></div>
+          <div class="input-group"><label>最大加仓单位数 (单系统)</label><input type="number" id="max-units" value="4" min="1" max="10"></div>
+          <div class="input-group" id="global-limit-group"><label>全局持仓上限 (双系统)</label><input type="number" id="global-limit" value="6" min="2" max="20"></div>
+        </div>
+        <div style="color:var(--text-secondary);font-size:0.74rem;margin-top:4px">📝 每上涨 间距×ATR 加1单位，达最大单位数后停止；双通道时总单位数受全局上限约束</div>
+      </div>
     </div>
     <!-- ⑧ 回测设置 -->
     <div class="card">
@@ -351,6 +399,23 @@ function calcATR(data,period){
   let sum=0;for(let i=0;i<data.length;i++){if(tr[i]!=null)sum+=tr[i];if(i>=period&&tr[i-period]!=null)sum-=tr[i-period];if(i>=period-1)atr[i]=sum/period}
   return atr;
 }
+function calcDonchianChannel(data,entryPeriod,exitPeriod){
+  const n=data.length;
+  const entryUpper=new Array(n).fill(null),exitLower=new Array(n).fill(null);
+  for(let i=0;i<n;i++){
+    if(i>=entryPeriod){
+      let mx=-Infinity;
+      for(let j=i-entryPeriod;j<i;j++){const v=data[j].high!=null?data[j].high:data[j].close;if(v!=null)mx=Math.max(mx,v)}
+      if(mx!==-Infinity)entryUpper[i]=mx;
+    }
+    if(i>=exitPeriod){
+      let mn=Infinity;
+      for(let j=i-exitPeriod;j<i;j++){const v=data[j].low!=null?data[j].low:data[j].close;if(v!=null)mn=Math.min(mn,v)}
+      if(mn!==Infinity)exitLower[i]=mn;
+    }
+  }
+  return{entryUpper,exitLower};
+}
 function parseDate(val){
   if(val instanceof Date)return val;
   if(typeof val==='number')return new Date((val-25569)*86400000);
@@ -365,15 +430,32 @@ const COL_ALIASES={date:['date','trade_date','日期','交易日期','时间','t
 function matchColumns(headers){const m={};for(const[k,aliases]of Object.entries(COL_ALIASES)){for(const alias of aliases){const idx=headers.findIndex(h=>String(h).toLowerCase().trim()===alias.toLowerCase());if(idx>=0){m[k]=idx;break}}}return{mapping:m,missing:Object.keys(COL_ALIASES).filter(k=>!(k in m))}}
 
 // ═══════════ STATE ═══════════
-const state={rawData:[],filteredData:[],currentModel:'dual_ma',chart:null,backtestResult:null};
+const state={rawData:[],filteredData:[],currentModel:'dual_ma',chart:null,backtestResult:null,lastResult:null};
 const $=id=>document.getElementById(id);
 
-// ═══════════ CONDITION TOGGLES (v4.3) ═══════════
-function toggleAtrParams(){
-  const el=$('atr-params');el.classList.toggle('collapsed',!$('sell-atr-stop').checked);
+// ═══════════ CONDITION TOGGLES ═══════════
+function toggleAtrParams(){const el=$('atr-params');el.classList.toggle('collapsed',!$('sell-atr-stop').checked)}
+function toggleDeathCrossParams(){const el=$('death-cross-params');el.classList.toggle('collapsed',!$('sell-death-cross').checked)}
+function togglePyramidStopParams(){const el=$('pyramid-stop-params');el.classList.toggle('collapsed',!$('sell-pyramid-stop').checked)}
+function toggleNoneFilter(){
+  const noneChecked=$('filter-none').checked;
+  ['filter-above-ma','filter-ma-rising'].forEach(id=>{
+    const el=$(id),row=el.closest('.check-row');
+    if(noneChecked){
+      if(!el.disabled){el.dataset.noneDisabled='true';el.checked=false;row.classList.add('disabled');el.disabled=true}
+    }else{
+      if(el.dataset.noneDisabled==='true'){delete el.dataset.noneDisabled;if(state.currentModel==='dual_ma'){row.classList.remove('disabled');el.disabled=false}}
+    }
+  });
 }
-function toggleDeathCrossParams(){
-  const el=$('death-cross-params');el.classList.toggle('collapsed',!$('sell-death-cross').checked);
+function toggleTurtleChannelParams(){
+  const shortEn=$('param-short-enabled')?.checked,longEn=$('param-long-enabled')?.checked;
+  if(shortEn===undefined)return;
+  $('param-short-channel').closest('.turtle-param-row').classList.toggle('disabled',!shortEn);
+  $('param-short-exit').closest('.turtle-param-row').classList.toggle('disabled',!shortEn);
+  $('param-long-channel').closest('.turtle-param-row').classList.toggle('disabled',!longEn);
+  $('param-long-exit').closest('.turtle-param-row').classList.toggle('disabled',!longEn);
+  $('global-limit-group').classList.toggle('hidden',!(shortEn&&longEn));
 }
 
 // ═══════════ MODEL REGISTRY ═══════════
@@ -407,6 +489,69 @@ const MODEL_REGISTRY={
     getSignalStats(result){return[{type:'golden_cross',label:'金叉(买入信号)',count:result.signals.filter(s=>s.type==='golden_cross').length},{type:'death_cross',label:'死叉(卖出信号)',count:result.signals.filter(s=>s.type==='death_cross').length}]},
     getChartTitle(params){return `双均线策略 — MA${params.short_window} / MA${params.long_window}`},
   },
+  'turtle':{
+    name:'海龟交易系统 (Turtle Trading)',
+    isTurtle:true,
+    params:[],
+    analyze(data,params){
+      const closes=data.map(d=>d.close),dates=data.map(d=>d.dateStr),n=data.length;
+      const signals=[];
+      let dsShort=null,dlShort=null,dsLong=null,dlLong=null;
+      if(params.shortEnabled){
+        const dc=calcDonchianChannel(data,params.shortChannel,params.shortExit);
+        dsShort=dc.entryUpper;dlShort=dc.exitLower;
+        for(let i=1;i<n;i++){
+          if(dsShort[i]!=null&&closes[i]!=null&&closes[i]>dsShort[i])
+            signals.push({type:'short_entry',label:'短通道入场',date:dates[i],index:i,price:closes[i]});
+          if(dlShort[i]!=null&&closes[i]!=null&&closes[i]<dlShort[i])
+            signals.push({type:'short_exit',label:'短通道退出',date:dates[i],index:i,price:closes[i]});
+        }
+      }
+      if(params.longEnabled){
+        const dc=calcDonchianChannel(data,params.longChannel,params.longExit);
+        dsLong=dc.entryUpper;dlLong=dc.exitLower;
+        for(let i=1;i<n;i++){
+          if(dsLong[i]!=null&&closes[i]!=null&&closes[i]>dsLong[i])
+            signals.push({type:'long_entry',label:'长通道入场',date:dates[i],index:i,price:closes[i]});
+          if(dlLong[i]!=null&&closes[i]!=null&&closes[i]<dlLong[i])
+            signals.push({type:'long_exit',label:'长通道退出',date:dates[i],index:i,price:closes[i]});
+        }
+      }
+      return{donchianShortEntryUpper:dsShort,donchianShortExitLower:dlShort,
+             donchianLongEntryUpper:dsLong,donchianLongExitLower:dlLong,signals,
+             maShort:null,maLong:null};
+    },
+    getChartSeries(result,dates,closes,params){
+      const series=[{name:'收盘价',type:'line',data:closes,smooth:false,symbol:'none',lineStyle:{width:1.5,color:'#34495e'},z:1}];
+      if(params.shortEnabled&&result.donchianShortEntryUpper){
+        series.push({name:`短通道入场(${params.shortChannel}日)`,type:'line',data:result.donchianShortEntryUpper,smooth:false,symbol:'none',lineStyle:{width:1.5,color:'#e74c3c'},z:2});
+        series.push({name:`短通道退出(${params.shortExit}日)`,type:'line',data:result.donchianShortExitLower,smooth:false,symbol:'none',lineStyle:{width:1.5,color:'#e74c3c',type:'dashed'},z:2});
+      }
+      if(params.longEnabled&&result.donchianLongEntryUpper){
+        series.push({name:`长通道入场(${params.longChannel}日)`,type:'line',data:result.donchianLongEntryUpper,smooth:false,symbol:'none',lineStyle:{width:1.5,color:'#3498db'},z:2});
+        series.push({name:`长通道退出(${params.longExit}日)`,type:'line',data:result.donchianLongExitLower,smooth:false,symbol:'none',lineStyle:{width:1.5,color:'#3498db',type:'dashed'},z:2});
+      }
+      series.push({name:'短通道入场',type:'scatter',symbolSize:12,symbol:'triangle',data:result.signals.filter(s=>s.type==='short_entry').map(s=>[s.date,s.price]),itemStyle:{color:'#e74c3c'},z:8});
+      series.push({name:'短通道退出',type:'scatter',symbolSize:12,symbol:'triangle',symbolRotate:180,data:result.signals.filter(s=>s.type==='short_exit').map(s=>[s.date,s.price]),itemStyle:{color:'#27ae60'},z:8});
+      series.push({name:'长通道入场',type:'scatter',symbolSize:12,symbol:'triangle',data:result.signals.filter(s=>s.type==='long_entry').map(s=>[s.date,s.price]),itemStyle:{color:'#e67e22'},z:8});
+      series.push({name:'长通道退出',type:'scatter',symbolSize:12,symbol:'triangle',symbolRotate:180,data:result.signals.filter(s=>s.type==='long_exit').map(s=>[s.date,s.price]),itemStyle:{color:'#00bcd4'},z:8});
+      return series;
+    },
+    getSignalStats(result){
+      return[
+        {type:'short_entry',label:'短通道入场信号',count:result.signals.filter(s=>s.type==='short_entry').length},
+        {type:'short_exit',label:'短通道退出信号',count:result.signals.filter(s=>s.type==='short_exit').length},
+        {type:'long_entry',label:'长通道入场信号',count:result.signals.filter(s=>s.type==='long_entry').length},
+        {type:'long_exit',label:'长通道退出信号',count:result.signals.filter(s=>s.type==='long_exit').length},
+      ];
+    },
+    getChartTitle(params){
+      let t='海龟交易系统 — ';const p=[];
+      if(params.shortEnabled)p.push(`短通道(${params.shortChannel}/${params.shortExit})`);
+      if(params.longEnabled)p.push(`长通道(${params.longChannel}/${params.longExit})`);
+      return t+p.join(' + ');
+    },
+  },
   'macd':{name:'MACD (待实现)',placeholder:true,params:[{key:'fast',label:'快线周期',type:'number',min:5,max:20,default:12},{key:'slow',label:'慢线周期',type:'number',min:20,max:40,default:26},{key:'signal',label:'信号线周期',type:'number',min:5,max:15,default:9}],analyze(){return{maShort:[],maLong:[],signals:[]}},getChartSeries(){return[]},getSignalStats(){return[]},getChartTitle(){return'MACD (待实现)'}},
   'bollinger':{name:'布林带 Bollinger Bands (待实现)',placeholder:true,params:[{key:'period',label:'周期',type:'number',min:10,max:50,default:20},{key:'stddev',label:'标准差倍数',type:'number',min:1,max:3,step:0.5,default:2}],analyze(){return{maShort:[],maLong:[],signals:[]}},getChartSeries(){return[]},getSignalStats(){return[]},getChartTitle(){return'布林带 (待实现)'}},
   'rsi':{name:'RSI 相对强弱指标 (待实现)',placeholder:true,params:[{key:'period',label:'周期',type:'number',min:5,max:30,default:14},{key:'overbought',label:'超买阈值',type:'number',min:60,max:90,default:70},{key:'oversold',label:'超卖阈值',type:'number',min:10,max:40,default:30}],analyze(){return{maShort:[],maLong:[],signals:[]}},getChartSeries(){return[]},getSignalStats(){return[]},getChartTitle(){return'RSI (待实现)'}},
@@ -418,6 +563,7 @@ function init(){
   for(const[key,model]of Object.entries(MODEL_REGISTRY)){const o=document.createElement('option');o.value=key;o.textContent=model.name;if(key===state.currentModel)o.selected=true;sel.appendChild(o)}
   sel.addEventListener('change',onModelChange);
   renderParamPanel();
+  updateModelUI();
 
   const zone=$('upload-zone'),input=$('file-input');
   zone.addEventListener('click',()=>input.click());
@@ -430,37 +576,124 @@ function init(){
   $('date-range-select').addEventListener('change',()=>{if(state.rawData.length>0){filterByDateRange();if(state.filteredData.length>0)updateDiagnostics()}});
   window.addEventListener('resize',()=>state.chart?.resize());
 }
-function onModelChange(){state.currentModel=$('model-select').value;renderParamPanel();const model=MODEL_REGISTRY[state.currentModel];$('analyze-btn').disabled=model.placeholder||false}
+
+function onModelChange(){
+  state.currentModel=$('model-select').value;
+  renderParamPanel();
+  updateModelUI();
+  const model=MODEL_REGISTRY[state.currentModel];
+  $('analyze-btn').disabled=model.placeholder||false;
+}
+
 function renderParamPanel(){
-  const model=MODEL_REGISTRY[state.currentModel],panel=$('param-panel');panel.innerHTML='';
-  for(const p of model.params){
-    const step=p.step||1,g=document.createElement('div');g.className='input-group';
-    g.innerHTML=`<label>${p.label}</label><input type="number" id="param-${p.key}" min="${p.min}" max="${p.max}" value="${p.default}" step="${step}">`;
-    panel.appendChild(g);
+  const model=MODEL_REGISTRY[state.currentModel],panel=$('param-panel');
+  panel.innerHTML='';
+  if(model.isTurtle){
+    panel.innerHTML=`
+      <div class="turtle-param-row">
+        <input type="checkbox" id="param-short-enabled" checked onchange="toggleTurtleChannelParams()">
+        <label>短期唐奇安通道</label>
+        <input type="number" id="param-short-channel" value="20" min="5" max="60">
+        <span class="unit">日</span>
+      </div>
+      <div class="turtle-param-row">
+        <label style="margin-left:26px">短期退出通道天数</label>
+        <input type="number" id="param-short-exit" value="10" min="3" max="30">
+        <span class="unit">日</span>
+        <span class="hint">⚠️ 建议入场周期的 0.3~0.5 倍</span>
+      </div>
+      <div class="turtle-param-row">
+        <input type="checkbox" id="param-long-enabled" checked onchange="toggleTurtleChannelParams()">
+        <label>长期唐奇安通道</label>
+        <input type="number" id="param-long-channel" value="55" min="10" max="120">
+        <span class="unit">日</span>
+      </div>
+      <div class="turtle-param-row">
+        <label style="margin-left:26px">长期退出通道天数</label>
+        <input type="number" id="param-long-exit" value="20" min="5" max="60">
+        <span class="unit">日</span>
+        <span class="hint">⚠️ 建议入场周期的 0.3~0.5 倍</span>
+      </div>`;
+    toggleTurtleChannelParams();
+  }else{
+    for(const p of model.params){
+      const step=p.step||1,g=document.createElement('div');g.className='input-group';
+      g.innerHTML=`<label>${p.label}</label><input type="number" id="param-${p.key}" min="${p.min}" max="${p.max}" value="${p.default}" step="${step}">`;
+      panel.appendChild(g);
+    }
   }
   $('analyze-btn').disabled=model.placeholder||false;
 }
-function getParams(){const model=MODEL_REGISTRY[state.currentModel],p={};for(const q of model.params){const el=$('param-'+q.key);p[q.key]=el?parseFloat(el.value)||q.default:q.default}return p}
 
-// ═══════════ GET CONFIG (v4.3: 读取复选框) ═══════════
+function getParams(){
+  const model=MODEL_REGISTRY[state.currentModel];
+  if(model.isTurtle){
+    return{
+      shortEnabled:$('param-short-enabled').checked,
+      shortChannel:parseInt($('param-short-channel').value)||20,
+      shortExit:parseInt($('param-short-exit').value)||10,
+      longEnabled:$('param-long-enabled').checked,
+      longChannel:parseInt($('param-long-channel').value)||55,
+      longExit:parseInt($('param-long-exit').value)||20,
+    };
+  }
+  const p={};for(const q of model.params){const el=$('param-'+q.key);p[q.key]=el?parseFloat(el.value)||q.default:q.default}return p;
+}
+
+// ═══════════ MODEL UI SWITCHING (方案C) ═══════════
+function setCheckState(id,enabled,checked){
+  const el=$(id);if(!el)return;
+  const row=el.closest('.check-row');
+  el.checked=checked;
+  if(enabled){row.classList.remove('disabled');el.disabled=false}
+  else{row.classList.add('disabled');el.disabled=true;el.checked=false}
+}
+function updateModelUI(){
+  const isTurtle=state.currentModel==='turtle';
+  // 买入信号
+  setCheckState('buy-golden-cross',!isTurtle,isTurtle?false:true);
+  setCheckState('buy-donchian-breakout',isTurtle,isTurtle?true:false);
+  // 趋势过滤
+  setCheckState('filter-none',true,isTurtle?true:false);
+  setCheckState('filter-above-ma',!isTurtle,isTurtle?false:true);
+  setCheckState('filter-ma-rising',!isTurtle,isTurtle?false:true);
+  // 止损 — 加仓后止损上移
+  if(isTurtle){$('sell-pyramid-stop').checked=true;togglePyramidStopParams()}
+  else{$('sell-pyramid-stop').checked=false;togglePyramidStopParams()}
+  // 止盈
+  setCheckState('sell-death-cross',!isTurtle,isTurtle?false:true);
+  setCheckState('sell-donchian-exit',isTurtle,isTurtle?true:false);
+  if(isTurtle){toggleDeathCrossParams()}
+  // 仓位管理
+  $('turtle-pos-params').classList.toggle('hidden',!isTurtle);
+  // "无"过滤互斥
+  toggleNoneFilter();
+}
+
+// ═══════════ GET CONFIG ═══════════
 function getConfig(){
+  const isTurtle=state.currentModel==='turtle';
   return{
     capital:parseFloat($('capital-input').value)||100000,
     riskPct:parseFloat($('risk-pct').value)||1,
-    // Buy conditions
     buyGoldenCross:$('buy-golden-cross').checked,
-    // Trend filters
+    buyDonchianBreakout:$('buy-donchian-breakout').checked,
+    filterNone:$('filter-none').checked,
     filterAboveMA:$('filter-above-ma').checked,
     filterMARising:$('filter-ma-rising').checked,
-    // Sell — stop loss
     sellATRStop:$('sell-atr-stop').checked,
     atrMultiplier:parseFloat($('atr-multiplier').value)||2,
     atrPeriod:parseInt($('atr-period').value)||14,
-    // Sell — take profit
+    sellPyramidStop:$('sell-pyramid-stop').checked,
+    pyramidStopCoeff:parseFloat($('pyramid-stop-coeff').value)||0.5,
     sellDeathCross:$('sell-death-cross').checked,
+    sellDonchianExit:$('sell-donchian-exit').checked,
     exitMode:$('exit-mode').value,
-    // Execution
+    pyramidInterval:parseFloat($('pyramid-interval').value)||0.5,
+    maxUnits:parseInt($('max-units').value)||4,
+    globalLimit:parseInt($('global-limit').value)||6,
     executionMode:$('execution-mode').value,
+    isTurtle:isTurtle,
   };
 }
 
@@ -550,112 +783,225 @@ function updateDiagnostics(){
   }
 }
 
-// ═══════════ BACKTEST ENGINE (v4.3: 按复选框条件执行) ═══════════
+// ═══════════ MA BACKTEST ENGINE ═══════════
 function runBacktest(data,signals,atr,maShort,maLong,config){
   const{capital,riskPct,atrMultiplier,exitMode,executionMode,
-    buyGoldenCross,filterAboveMA,filterMARising,
-    sellATRStop,sellDeathCross}=config;
+    buyGoldenCross,filterNone,filterAboveMA,filterMARising,
+    sellATRStop,sellPyramidStop,pyramidStopCoeff,sellDeathCross}=config;
   let cash=capital,positions=[],trades=[],pendingOrders=[],dailyEquity=[],nextPosId=1;
 
-  function addTrade(date,type,price,shares,amount,pnl,reason){trades.push({date,type,price,shares,amount,pnl,reason})}
+  function addTrade(date,type,price,shares,amount,pnl,reason,system){trades.push({date,type,price,shares,amount,pnl,reason,system:system||''})}
   function execBuy(day,price,sigDay){
-    if(!sellATRStop||atr[sigDay]==null)return; // ATR止损未启用则无法计算止损价，跳过建仓
+    if(!sellATRStop||atr[sigDay]==null)return;
     const sl=price-atrMultiplier*atr[sigDay],riskPerShare=price-sl;
     if(riskPerShare<=0)return;
     const rawShares=(capital*riskPct/100)/riskPerShare,shares=Math.floor(rawShares/100)*100;
     if(shares<=0)return;
     const cost=shares*price;if(cost>cash)return;
     cash-=cost;
-    positions.push({id:nextPosId++,entryDate:day.dateStr,entryPrice:price,shares,stopLoss:sl,atrAtEntry:atr[sigDay]});
-    addTrade(day.dateStr,'买入',price,shares,cost,null,'金叉买入');
+    if(sellPyramidStop&&positions.length>0){
+      const shift=pyramidStopCoeff*atr[sigDay];
+      for(const pos of positions)pos.stopLoss+=shift;
+    }
+    positions.push({id:nextPosId++,entryDate:day.dateStr,entryPrice:price,shares,stopLoss:sl,atrAtEntry:atr[sigDay],system:''});
+    addTrade(day.dateStr,'买入',price,shares,cost,null,'金叉买入','');
   }
 
   for(let t=0;t<data.length;t++){
     const day=data[t];
-
-    // 0. 处理隔日委托 + 隔夜缺口 (next_open)
     if(executionMode==='next_open'){
       if(pendingOrders.length>0){
         const sells=[],buys=[];
         for(const o of pendingOrders){if(o.action==='sell')sells.push(o);else buys.push(o)}
         for(const o of sells){
           const sp=day.open;
-          if(o.posIds==='all'){
-            for(const pos of positions){const rev=pos.shares*sp,pnl=(sp-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,o.reason==='ATR止损'?'止损卖出':(o.reason.includes('减仓')?'止盈减仓':'止盈卖出'),sp,pos.shares,rev,pnl,o.reason)}
-            positions=[];
-          }else if(o.posIds==='fifo'){
-            if(positions.length>0){const pos=positions[0],rev=pos.shares*sp,pnl=(sp-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止盈减仓',sp,pos.shares,rev,pnl,o.reason);positions.shift()}
-          }else{
-            const idsToSell=new Set(o.posIds),remaining=[];
-            for(const pos of positions){if(idsToSell.has(pos.id)){const rev=pos.shares*sp,pnl=(sp-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止损卖出',sp,pos.shares,rev,pnl,o.reason)}else remaining.push(pos)}
-            positions=remaining;
-          }
+          if(o.posIds==='all'){for(const pos of positions){const rev=pos.shares*sp,pnl=(sp-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,o.reason==='ATR止损'?'止损卖出':(o.reason.includes('减仓')?'止盈减仓':'止盈卖出'),sp,pos.shares,rev,pnl,o.reason,'')}positions=[]}
+          else if(o.posIds==='fifo'){if(positions.length>0){const pos=positions[0],rev=pos.shares*sp,pnl=(sp-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止盈减仓',sp,pos.shares,rev,pnl,o.reason,'');positions.shift()}}
+          else{const ids=new Set(o.posIds),rem=[];for(const pos of positions){if(ids.has(pos.id)){const rev=pos.shares*sp,pnl=(sp-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止损卖出',sp,pos.shares,rev,pnl,o.reason,'')}else rem.push(pos)}positions=rem}
         }
         for(const o of buys)execBuy(day,day.open,o.signalDay);
         pendingOrders=[];
-        // Overnight gap stop
-        if(day.open!=null&&sellATRStop){const stopped=[],alive=[];for(const pos of positions){if(day.open<=pos.stopLoss){const rev=pos.shares*day.open,pnl=(day.open-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止损卖出',day.open,pos.shares,rev,pnl,'ATR止损(隔空)')}else alive.push(pos)}positions=alive}
+        if(day.open!=null&&sellATRStop){const stopped=[],alive=[];for(const pos of positions){if(day.open<=pos.stopLoss){const rev=pos.shares*day.open,pnl=(day.open-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止损卖出',day.open,pos.shares,rev,pnl,'ATR止损(隔空)','')}else alive.push(pos)}positions=alive}
       }else{
-        // 无委托但有持仓，检查隔夜缺口
-        if(day.open!=null&&sellATRStop){const stopped=[],alive=[];for(const pos of positions){if(day.open<=pos.stopLoss){const rev=pos.shares*day.open,pnl=(day.open-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止损卖出',day.open,pos.shares,rev,pnl,'ATR止损(隔空)')}else alive.push(pos)}positions=alive}
+        if(day.open!=null&&sellATRStop){const stopped=[],alive=[];for(const pos of positions){if(day.open<=pos.stopLoss){const rev=pos.shares*day.open,pnl=(day.open-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止损卖出',day.open,pos.shares,rev,pnl,'ATR止损(隔空)','')}else alive.push(pos)}positions=alive}
       }
     }
-
     if(maShort[t]==null||maLong[t]==null){const posVal=positions.reduce((s,p)=>s+p.shares*day.close,0);dailyEquity.push(cash+posVal);continue}
 
-    // 1. Check exits — STOP LOSS (v4.3: only if enabled)
     if(sellATRStop){
-      const stoppedPositions=positions.filter(p=>day.close<=p.stopLoss);
-      if(stoppedPositions.length>0){
-        if(executionMode==='close'){
-          for(const pos of stoppedPositions){const rev=pos.shares*day.close,pnl=(day.close-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止损卖出',day.close,pos.shares,rev,pnl,'ATR止损')}
-          const idsToRemove=new Set(stoppedPositions.map(p=>p.id));positions=positions.filter(p=>!idsToRemove.has(p.id))
-        }else{pendingOrders.push({action:'sell',posIds:stoppedPositions.map(p=>p.id),reason:'ATR止损'})}
+      const stopped=positions.filter(p=>day.close<=p.stopLoss);
+      if(stopped.length>0){
+        if(executionMode==='close'){for(const pos of stopped){const rev=pos.shares*day.close,pnl=(day.close-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止损卖出',day.close,pos.shares,rev,pnl,'ATR止损','')}const ids=new Set(stopped.map(p=>p.id));positions=positions.filter(p=>!ids.has(p.id))}
+        else pendingOrders.push({action:'sell',posIds:stopped.map(p=>p.id),reason:'ATR止损'});
       }
     }
-
-    // 2. Check exits — TAKE PROFIT (v4.3: only if enabled)
     if(sellDeathCross){
-      const isDeathCross=signals.some(s=>s.index===t&&s.type==='death_cross');
-      if(isDeathCross&&positions.length>0){
+      const isDC=signals.some(s=>s.index===t&&s.type==='death_cross');
+      if(isDC&&positions.length>0){
         if(executionMode==='close'){
-          if(exitMode==='all'){for(const pos of positions){const rev=pos.shares*day.close,pnl=(day.close-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止盈卖出',day.close,pos.shares,rev,pnl,'死叉止盈')}positions=[]}
-          else{if(positions.length>0){const pos=positions[0],rev=pos.shares*day.close,pnl=(day.close-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止盈减仓',day.close,pos.shares,rev,pnl,'死叉减仓');positions.shift()}}
-        }else{pendingOrders.push({action:'sell',posIds:exitMode,reason:exitMode==='all'?'死叉止盈':'死叉减仓'})}
+          if(exitMode==='all'){for(const pos of positions){const rev=pos.shares*day.close,pnl=(day.close-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止盈卖出',day.close,pos.shares,rev,pnl,'死叉止盈','')}positions=[]}
+          else{if(positions.length>0){const pos=positions[0],rev=pos.shares*day.close,pnl=(day.close-pos.entryPrice)*pos.shares;cash+=rev;addTrade(day.dateStr,'止盈减仓',day.close,pos.shares,rev,pnl,'死叉减仓','');positions.shift()}}
+        }else pendingOrders.push({action:'sell',posIds:exitMode,reason:exitMode==='all'?'死叉止盈':'死叉减仓'});
       }
     }
 
-    // 3. Check entries — BUY SIGNAL + TREND FILTER (v4.3: checkbox-based)
-    // Buy signal: OR logic
     let buySignal=false;
     if(buyGoldenCross){const isGold=signals.some(s=>s.index===t&&s.type==='golden_cross');if(isGold)buySignal=true}
-    // (future: macd_cross, rsi_oversold, volume_breakout...)
-
-    // Trend filter: AND logic
     let trendOk=true;
-    let anyFilterActive=false;
-    if(filterAboveMA){anyFilterActive=true;if(!(day.close>maLong[t]))trendOk=false}
-    if(filterMARising){anyFilterActive=true;if(!(t>0&&maShort[t-1]!=null&&maShort[t]>maShort[t-1]))trendOk=false}
-    // If no filters are active, trend passes by default (裸信号策略)
-
+    if(!filterNone){
+      if(filterAboveMA&&!(day.close>maLong[t]))trendOk=false;
+      if(filterMARising&&!(t>0&&maShort[t-1]!=null&&maShort[t]>maShort[t-1]))trendOk=false;
+    }
     if(buySignal&&trendOk){
       if(executionMode==='close')execBuy(day,day.close,t);
       else pendingOrders.push({action:'buy',signalDay:t,reason:'金叉买入'});
     }
-
-    // 4. Update P&L
     const posVal=positions.reduce((s,p)=>s+p.shares*day.close,0);dailyEquity.push(cash+posVal);
   }
+  return calcPerf(positions,trades,dailyEquity,capital,cash);
+}
 
-  // Performance metrics
+// ═══════════ TURTLE BACKTEST ENGINE (v5.0) ═══════════
+function runTurtleBacktest(data,result,atr,config,params){
+  const{capital,riskPct,atrMultiplier,executionMode,
+    sellATRStop,sellPyramidStop,pyramidStopCoeff,sellDonchianExit,
+    pyramidInterval,maxUnits,globalLimit}=config;
+  const{shortEnabled,longEnabled}=params;
+  let cash=capital,positions=[],trades=[],pendingOrders=[],dailyEquity=[],nextPosId=1,completedCycles=0;
+
+  function addTrade(date,type,price,shares,amount,pnl,reason,system){trades.push({date,type,price,shares,amount,pnl,reason,system})}
+  function calcShares(atrVal){
+    if(atrVal==null||atrVal<=0)return 0;
+    const riskAmt=capital*riskPct/100,riskPerShare=atrMultiplier*atrVal;
+    if(riskPerShare<=0)return 0;
+    return Math.floor((riskAmt/riskPerShare)/100)*100;
+  }
+  function sysUnits(sys){return positions.filter(p=>p.system===sys).length}
+  function lastEntryPrice(sys){const ps=positions.filter(p=>p.system===sys);return ps.length>0?ps[ps.length-1].entryPrice:null}
+
+  function execBuy(sys,day,price,sigDay,isPyramid){
+    if(!sellATRStop||atr[sigDay]==null)return;
+    const sl=price-atrMultiplier*atr[sigDay],shares=calcShares(atr[sigDay]);
+    if(shares<=0)return;
+    const cost=shares*price;if(cost>cash)return;
+    cash-=cost;
+    if(isPyramid&&sellPyramidStop){
+      const shift=pyramidStopCoeff*atr[sigDay];
+      for(const pos of positions)if(pos.system===sys)pos.stopLoss+=shift;
+    }
+    positions.push({id:nextPosId++,system:sys,entryDate:day.dateStr,entryPrice:price,shares,stopLoss:sl});
+    const lbl=sys==='short'?'短通道':'长通道';
+    addTrade(day.dateStr,isPyramid?'金字塔加仓':'买入',price,shares,cost,null,lbl+(isPyramid?'金字塔加仓':'唐奇安突破买入'),sys);
+  }
+  function closeSys(sys,day,price,reason){
+    const toClose=positions.filter(p=>p.system===sys);
+    if(toClose.length===0)return;
+    const lbl=sys==='short'?'短通道':'长通道';
+    for(const pos of toClose){
+      const rev=pos.shares*price,pnl=(price-pos.entryPrice)*pos.shares;
+      cash+=rev;
+      const tp=reason.includes('止损')?'止损卖出':'止盈卖出';
+      addTrade(day.dateStr,tp,price,pos.shares,rev,pnl,lbl+reason,sys);
+    }
+    positions=positions.filter(p=>p.system!==sys);
+    completedCycles++;
+  }
+
+  for(let t=0;t<data.length;t++){
+    const day=data[t];
+
+    // 0. 处理隔日委托
+    if(executionMode==='next_open'){
+      if(pendingOrders.length>0){
+        for(const o of pendingOrders){
+          if(o.action==='buy')execBuy(o.system,day,day.open,o.sigDay,o.isPyramid);
+          else if(o.action==='sell')closeSys(o.system,day,day.open,o.reason);
+        }
+        pendingOrders=[];
+      }
+      // 隔夜缺口止损
+      if(day.open!=null&&sellATRStop){
+        for(const sys of['short','long']){
+          const sp=positions.filter(p=>p.system===sys&&day.open<=p.stopLoss);
+          if(sp.length>0)closeSys(sys,day,day.open,'ATR止损(隔空)');
+        }
+      }
+    }
+
+    const dsShort=result.donchianShortEntryUpper,dsLong=result.donchianLongEntryUpper;
+
+    // 2. 检查止损
+    if(sellATRStop){
+      for(const sys of['short','long']){
+        const stopped=positions.filter(p=>p.system===sys&&day.close<=p.stopLoss);
+        if(stopped.length>0){
+          if(executionMode==='close')closeSys(sys,day,day.close,'ATR止损');
+          else pendingOrders.push({action:'sell',system:sys,reason:'ATR止损'});
+        }
+      }
+    }
+    // 2b. 检查唐奇安反向突破止盈
+    if(sellDonchianExit){
+      if(shortEnabled&&result.donchianShortExitLower&&result.donchianShortExitLower[t]!=null){
+        if(day.close<result.donchianShortExitLower[t]&&sysUnits('short')>0){
+          if(executionMode==='close')closeSys('short',day,day.close,'唐奇安反向突破');
+          else pendingOrders.push({action:'sell',system:'short',reason:'唐奇安反向突破'});
+        }
+      }
+      if(longEnabled&&result.donchianLongExitLower&&result.donchianLongExitLower[t]!=null){
+        if(day.close<result.donchianLongExitLower[t]&&sysUnits('long')>0){
+          if(executionMode==='close')closeSys('long',day,day.close,'唐奇安反向突破');
+          else pendingOrders.push({action:'sell',system:'long',reason:'唐奇安反向突破'});
+        }
+      }
+    }
+
+    // 3. 金字塔加仓检查
+    if(atr[t]!=null){
+      for(const sys of['short','long']){
+        const units=sysUnits(sys);
+        if(units===0||units>=maxUnits)continue;
+        if(shortEnabled&&longEnabled&&positions.length>=globalLimit)continue;
+        const lastEP=lastEntryPrice(sys);if(lastEP==null)continue;
+        if(day.close>=lastEP+pyramidInterval*atr[t]){
+          if(executionMode==='close')execBuy(sys,day,day.close,t,true);
+          else pendingOrders.push({action:'buy',system:sys,sigDay:t,isPyramid:true});
+        }
+      }
+    }
+
+    // 4. 初始入场 — 唐奇安突破
+    if(shortEnabled&&dsShort&&dsShort[t]!=null){
+      if(day.close>dsShort[t]&&sysUnits('short')===0){
+        if(executionMode==='close')execBuy('short',day,day.close,t,false);
+        else pendingOrders.push({action:'buy',system:'short',sigDay:t,isPyramid:false});
+      }
+    }
+    if(longEnabled&&dsLong&&dsLong[t]!=null){
+      if(day.close>dsLong[t]&&sysUnits('long')===0){
+        if(executionMode==='close')execBuy('long',day,day.close,t,false);
+        else pendingOrders.push({action:'buy',system:'long',sigDay:t,isPyramid:false});
+      }
+    }
+
+    // 5. 更新盈亏
+    const posVal=positions.reduce((s,p)=>s+p.shares*day.close,0);dailyEquity.push(cash+posVal);
+  }
+  return calcPerf(positions,trades,dailyEquity,capital,cash,completedCycles);
+}
+
+// ═══════════ PERFORMANCE CALC ═══════════
+function calcPerf(positions,trades,dailyEquity,capital,cash,overrideCycles){
   if(dailyEquity.length===0)return{positions,trades,dailyEquity:[capital],cumulativeReturn:0,maxDrawdown:0,sharpeRatio:0,totalTrades:0,cash,finalEquity:capital};
   const finalEquity=dailyEquity[dailyEquity.length-1],cumRet=(finalEquity-capital)/capital*100;
   let peak=dailyEquity[0],mdd=0;for(const eq of dailyEquity){if(eq>peak)peak=eq;mdd=Math.min(mdd,(eq-peak)/peak*100)}
   const dRets=[];for(let i=1;i<dailyEquity.length;i++){if(dailyEquity[i-1]!==0)dRets.push((dailyEquity[i]-dailyEquity[i-1])/Math.abs(dailyEquity[i-1]))}
   const meanR=dRets.length>0?dRets.reduce((a,b)=>a+b,0)/dRets.length:0,stdR=dRets.length>0?Math.sqrt(dRets.reduce((s,r)=>s+(r-meanR)**2,0)/dRets.length):1;
   const sharpe=stdR>0?(meanR-0.03/243)/stdR*Math.sqrt(243):0;
-  const buyCt=trades.filter(t=>t.type==='买入').length,sellCt=trades.filter(t=>t.type!=='买入').length;
-  return{positions,trades,dailyEquity,cumulativeReturn:cumRet,maxDrawdown:mdd,sharpeRatio:sharpe,totalTrades:Math.min(buyCt,sellCt),cash,finalEquity};
+  let totalTrades;
+  if(overrideCycles!=null)totalTrades=overrideCycles;
+  else{const buyCt=trades.filter(t=>t.type==='买入').length,sellCt=trades.filter(t=>t.type!=='买入').length;totalTrades=Math.min(buyCt,sellCt)}
+  return{positions,trades,dailyEquity,cumulativeReturn:cumRet,maxDrawdown:mdd,sharpeRatio:sharpe,totalTrades,cash,finalEquity};
 }
 
 // ═══════════ ANALYSIS ═══════════
@@ -665,21 +1011,24 @@ function runAnalysis(){
   const params=getParams(),config=getConfig();
   if(config.capital<=0){alert('请输入有效的投资金额');return}
 
-  // Validate: at least one buy signal enabled
-  if(!config.buyGoldenCross){alert('请至少勾选一个买入信号条件');return}
-  // Validate: if ATR stop is enabled but no sell conditions that need it...
-  // Warn if no exit conditions at all
-  if(!config.sellATRStop&&!config.sellDeathCross){if(!confirm('⚠️ 未启用任何卖出条件（止损和止盈均关闭），持仓将永远不退出。继续？'))return}
+  if(config.isTurtle){
+    if(!params.shortEnabled&&!params.longEnabled){alert('请至少勾选一个唐奇安通道');return}
+    if(!config.buyDonchianBreakout){alert('海龟模型需要勾选"唐奇安通道突破"买入信号');return}
+    if(!config.sellATRStop&&!config.sellDonchianExit){if(!confirm('⚠️ 未启用任何卖出条件，持仓将永远不退出。继续？'))return}
+  }else{
+    if(!config.buyGoldenCross){alert('请至少勾选一个买入信号条件');return}
+    if(!config.sellATRStop&&!config.sellDeathCross){if(!confirm('⚠️ 未启用任何卖出条件，持仓将永远不退出。继续？'))return}
+  }
 
   const result=model.analyze(state.filteredData,params);
   const atr=calcATR(state.filteredData,config.atrPeriod);
-  const bt=runBacktest(state.filteredData,result.signals,atr,result.maShort,result.maLong,config);
+  let bt;
+  if(config.isTurtle)bt=runTurtleBacktest(state.filteredData,result,atr,config,params);
+  else bt=runBacktest(state.filteredData,result.signals,atr,result.maShort,result.maLong,config);
   state.backtestResult=bt;state.lastResult=result;
 
-  // Show output area
   $('metrics-card').classList.remove('hidden');$('chart-card').classList.remove('hidden');$('position-card').classList.remove('hidden');
   if(!state.chart)state.chart=echarts.init($('chart-container'));
-
   updateMetrics(bt);
   renderChart(result,bt,params,config);
   renderPositionPanel(bt,config);
@@ -700,35 +1049,26 @@ function renderChart(result,bt,params,config){
   const model=MODEL_REGISTRY[state.currentModel];
   let series=model.getChartSeries(result,dates,closes,params);
 
-  // Buy/Sell points
-  const buyPts=bt.trades.filter(t=>t.type==='买入').map(t=>({name:t.date,value:[t.date,t.price]}));
-  const sellPts=bt.trades.filter(t=>t.type!=='买入').map(t=>({name:t.date,value:[t.date,t.price]}));
+  const buyPts=bt.trades.filter(t=>t.type==='买入').map(t=>({value:[t.date,t.price]}));
+  const pyramidPts=bt.trades.filter(t=>t.type==='金字塔加仓').map(t=>({value:[t.date,t.price]}));
+  const sellPts=bt.trades.filter(t=>t.type!=='买入'&&t.type!=='金字塔加仓').map(t=>({value:[t.date,t.price]}));
   series.push({name:'买入点',type:'scatter',symbolSize:16,symbol:'circle',data:buyPts.map(p=>p.value),itemStyle:{color:'#3498db',borderColor:'#fff',borderWidth:2},z:9});
+  if(pyramidPts.length>0)series.push({name:'加仓点',type:'scatter',symbolSize:14,symbol:'diamond',data:pyramidPts.map(p=>p.value),itemStyle:{color:'#e67e22',borderColor:'#fff',borderWidth:2},z:9});
   series.push({name:'卖出点',type:'scatter',symbolSize:16,symbol:'circle',data:sellPts.map(p=>p.value),itemStyle:{color:'#8e44ad',borderColor:'#fff',borderWidth:2},z:9});
 
-  // Stop loss lines
-  if(config.sellATRStop){
-    const stopLines=[];
+  if(config.sellATRStop&&bt.positions.length>0){
+    const stopLines=new Array(dates.length).fill(null);
     for(const pos of bt.positions){
       const entryIdx=dates.indexOf(pos.entryDate);
-      const exitTrade=bt.trades.filter(t=>t.type!=='买入').find(t=>Math.abs(t.price-pos.entryPrice)<0.01||t.shares===pos.shares);
-      const exitIdx=exitTrade?dates.indexOf(exitTrade.date):dates.length-1;
-      if(entryIdx>=0&&exitIdx>=0){
-        for(let i=entryIdx;i<=exitIdx;i++){
-          if(!stopLines[i]||pos.stopLoss<stopLines[i])stopLines[i]=pos.stopLoss;
-        }
-      }
+      if(entryIdx>=0){for(let i=entryIdx;i<dates.length;i++){if(stopLines[i]==null||pos.stopLoss<stopLines[i])stopLines[i]=pos.stopLoss}}
     }
-    const slData=stopLines.length>0?new Array(dates.length).fill(null).map((_,i)=>stopLines[i]||null):null;
-    if(slData&&slData.some(v=>v!=null)){
-      series.push({name:'止损线',type:'line',data:slData,step:'start',symbol:'none',lineStyle:{type:'dashed',color:'#bbb',width:1},z:0.5});
-    }
+    if(stopLines.some(v=>v!=null))series.push({name:'止损线',type:'line',data:stopLines,step:'start',symbol:'none',lineStyle:{type:'dashed',color:'#bbb',width:1},z:0.5});
   }
 
   state.chart.setOption({
     title:{text:model.getChartTitle(params),left:'center',textStyle:{fontSize:14,fontWeight:700,color:'#2c3e50'}},
-    tooltip:{trigger:'axis',formatter:function(pts){let h='<strong>'+pts[0].axisValue+'</strong><br/>';for(const p of pts){if(p.seriesName==='买入点')h+='🔵 买入: ¥'+p.value[1].toFixed(2)+'<br/>';else if(p.seriesName==='卖出点')h+='🟣 卖出: ¥'+p.value[1].toFixed(2)+'<br/>';else if(p.value!=null&&!Array.isArray(p.value)&&p.seriesName!=='止损线')h+='<span style="color:'+p.color+'">● '+p.seriesName+': ¥'+p.value.toFixed(2)+'</span><br/>';}return h}},
-    legend:{data:series.filter(s=>!['买入点','卖出点','止损线'].includes(s.name)||s.data.length>0).map(s=>s.name),bottom:0,textStyle:{fontSize:10}},
+    tooltip:{trigger:'axis',formatter:function(pts){let h='<strong>'+pts[0].axisValue+'</strong><br/>';for(const p of pts){if(p.value==null)continue;if(p.seriesName==='买入点')h+='🔵 买入: ¥'+p.value[1].toFixed(2)+'<br/>';else if(p.seriesName==='卖出点')h+='🟣 卖出: ¥'+p.value[1].toFixed(2)+'<br/>';else if(p.seriesName==='加仓点')h+='🟠 加仓: ¥'+p.value[1].toFixed(2)+'<br/>';else if(Array.isArray(p.value))h+='<span style="color:'+p.color+'">● '+p.seriesName+': ¥'+p.value[1].toFixed(2)+'</span><br/>';else if(!isNaN(p.value))h+='<span style="color:'+p.color+'">● '+p.seriesName+': ¥'+p.value.toFixed(2)+'</span><br/>';}return h}},
+    legend:{data:series.filter(s=>s.data&&s.data.length>0).map(s=>s.name),bottom:0,textStyle:{fontSize:10}},
     grid:{left:60,right:40,top:50,bottom:40},
     xAxis:{type:'category',data:dates,axisLabel:{formatter:v=>v.slice(5),fontSize:10,interval:Math.floor(dates.length/18)}},
     yAxis:{type:'value',name:'价格 (¥)',scale:true,axisLabel:{fontSize:10}},
@@ -749,27 +1089,34 @@ function renderPositionPanel(bt,config){
     '<div class="as-item"><span class="as-label">总资产净值</span><span class="as-value" style="font-size:1.1rem">'+fmtMoney(totalEquity)+'</span></div>'+
     '<div class="as-item"><span class="as-label">总收益率</span><span class="as-value" style="color:'+(bt.cumulativeReturn>=0?'var(--accent)':'var(--green)')+'">'+(bt.cumulativeReturn>=0?'+':'')+bt.cumulativeReturn.toFixed(2)+'%</span></div>';
 
-  // Position table
+  const isTurtle=config.isTurtle;
   if(bt.positions.length===0){$('position-table').innerHTML='<div class="empty-state">✅ 所有持仓已平仓，无当前持仓</div>'}
   else{
     const lastClose=lastData.close;
-    let h='<table><thead><tr><th>建仓日期</th><th>方向</th><th>数量(股)</th><th>入场价</th><th>止损价</th><th>当前价</th><th>持仓盈亏</th><th>盈亏%</th></tr></thead><tbody>';
+    let h='<table><thead><tr>';
+    if(isTurtle)h+='<th>系统</th>';
+    h+='<th>建仓日期</th><th>方向</th><th>数量(股)</th><th>入场价</th><th>止损价</th><th>当前价</th><th>持仓盈亏</th><th>盈亏%</th></tr></thead><tbody>';
     let totalPnl=0;
     for(const pos of bt.positions){
       const pnl=(lastClose-pos.entryPrice)*pos.shares,pnlPct=(lastClose/pos.entryPrice-1)*100;totalPnl+=pnl;
-      h+='<tr><td>'+pos.entryDate+'</td><td>多头</td><td>'+pos.shares+'</td><td>¥'+pos.entryPrice.toFixed(2)+'</td><td>¥'+pos.stopLoss.toFixed(2)+'</td><td>¥'+lastClose.toFixed(2)+'</td><td class="'+(pnl>=0?'pnl-up':'pnl-down')+'">'+(pnl>=0?'+':'')+'¥'+pnl.toFixed(2)+'</td><td class="'+(pnlPct>=0?'pnl-up':'pnl-down')+'">'+(pnlPct>=0?'+':'')+pnlPct.toFixed(2)+'%</td></tr>';
+      h+='<tr>';
+      if(isTurtle)h+='<td class="'+(pos.system==='short'?'sys-short':'sys-long')+'">'+(pos.system==='short'?'短通道':'长通道')+'</td>';
+      h+='<td>'+pos.entryDate+'</td><td>多头</td><td>'+pos.shares+'</td><td>¥'+pos.entryPrice.toFixed(2)+'</td><td>¥'+pos.stopLoss.toFixed(2)+'</td><td>¥'+lastClose.toFixed(2)+'</td><td class="'+(pnl>=0?'pnl-up':'pnl-down')+'">'+(pnl>=0?'+':'')+'¥'+pnl.toFixed(2)+'</td><td class="'+(pnlPct>=0?'pnl-up':'pnl-down')+'">'+(pnlPct>=0?'+':'')+pnlPct.toFixed(2)+'%</td></tr>';
     }
-    h+='<tr style="font-weight:700;background:#f0f4ff"><td colspan="6" style="text-align:right">合计</td><td class="'+(totalPnl>=0?'pnl-up':'pnl-down')+'">'+(totalPnl>=0?'+':'')+'¥'+totalPnl.toFixed(2)+'</td><td></td></tr>';
+    h+='<tr style="font-weight:700;background:#f0f4ff"><td colspan="'+(isTurtle?7:6)+'" style="text-align:right">合计</td><td class="'+(totalPnl>=0?'pnl-up':'pnl-down')+'">'+(totalPnl>=0?'+':'')+'¥'+totalPnl.toFixed(2)+'</td><td></td></tr>';
     h+='</tbody></table>';$('position-table').innerHTML=h;
   }
 
-  // Trade log
   if(bt.trades.length===0){$('trade-table').innerHTML='<div class="empty-state">暂无交易记录</div>';return}
   const sortedTrades=[...bt.trades].reverse();
-  let h='<table><thead><tr><th>日期</th><th>类型</th><th>价格</th><th>数量</th><th>金额</th><th>盈亏</th><th>触发原因</th></tr></thead><tbody>';
+  let h='<table><thead><tr>';
+  if(isTurtle)h+='<th>系统</th>';
+  h+='<th>日期</th><th>类型</th><th>价格</th><th>数量</th><th>金额</th><th>盈亏</th><th>触发原因</th></tr></thead><tbody>';
   for(const t of sortedTrades){
-    let typeCls='';if(t.type==='买入')typeCls='signal-gold';else if(t.type.includes('止损'))typeCls='signal-death';else typeCls='';
-    h+='<tr><td>'+t.date+'</td><td class="'+typeCls+'">'+t.type+'</td><td>¥'+t.price.toFixed(2)+'</td><td>'+t.shares+'</td><td>¥'+(t.amount||0).toFixed(2)+'</td><td>'+(t.pnl!=null?((t.pnl>=0?'+':'')+'¥'+t.pnl.toFixed(2)):'-')+'</td><td>'+t.reason+'</td></tr>';
+    let typeCls='';if(t.type==='买入')typeCls='signal-gold';else if(t.type.includes('止损'))typeCls='signal-death';else if(t.type==='金字塔加仓')typeCls='signal-pyramid';
+    h+='<tr>';
+    if(isTurtle)h+='<td class="'+(t.system==='short'?'sys-short':'sys-long')+'">'+(t.system==='short'?'短通道':'长通道')+'</td>';
+    h+='<td>'+t.date+'</td><td class="'+typeCls+'">'+t.type+'</td><td>¥'+t.price.toFixed(2)+'</td><td>'+t.shares+'</td><td>¥'+(t.amount||0).toFixed(2)+'</td><td>'+(t.pnl!=null?((t.pnl>=0?'+':'')+'¥'+t.pnl.toFixed(2)):'-')+'</td><td>'+t.reason+'</td></tr>';
   }
   h+='</tbody></table>';$('trade-table').innerHTML=h;
 }
