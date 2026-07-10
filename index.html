@@ -451,9 +451,10 @@ function toggleNoneFilter(){
 function toggleTurtleChannelParams(){
   const shortEn=$('param-short-enabled')?.checked,longEn=$('param-long-enabled')?.checked;
   if(shortEn===undefined)return;
-  $('param-short-channel').closest('.turtle-param-row').classList.toggle('disabled',!shortEn);
+  // 只禁用数字输入框，不禁用包含checkbox的整行（否则checkbox无法重新勾选）
+  $('param-short-channel').disabled=!shortEn;
   $('param-short-exit').closest('.turtle-param-row').classList.toggle('disabled',!shortEn);
-  $('param-long-channel').closest('.turtle-param-row').classList.toggle('disabled',!longEn);
+  $('param-long-channel').disabled=!longEn;
   $('param-long-exit').closest('.turtle-param-row').classList.toggle('disabled',!longEn);
   $('global-limit-group').classList.toggle('hidden',!(shortEn&&longEn));
 }
